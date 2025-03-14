@@ -1,60 +1,3 @@
-/*import React, { useState } from "react";
-import usePetriNet from "./components/PetriNet.js";
-
-const App = () => {
-  const { places, transitions, arcs, addPlace, addTransition, addArc } = usePetriNet();
-  const [connecting, setConnecting] = useState(null);
-
-  const CanvasClick = (e) => {
-    const { offsetX, offsetY } = e.nativeEvent;
-    if (e.shiftKey) {
-      addTransition(offsetX, offsetY);
-    } else {
-      addPlace(offsetX, offsetY);
-    }
-  };
-
-  const startConnection = (id) => {
-    setConnecting(id);
-  };
-
-  const completeConnection = (id) => {
-    if (connecting && id !== connecting) {
-      addArc(connecting, id);
-      setConnecting(null);
-    }
-  };
-
-  return (
-    <svg width="100vw" height="100vh" onClick={CanvasClick}>
-      {arcs.map((arc, index) => {
-        const from = [...places, ...transitions].find((el) => el.id === arc.from);
-        const to = [...places, ...transitions].find((el) => el.id === arc.to);
-        return from && to ? (
-          <line key={index} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="black" strokeWidth="2" />
-        ) : null;
-      })}
-
-      {places.map((place) => (
-        <circle key={place.id} cx={place.x} cy={place.y} r="20" fill="white" stroke="black"
-          onClick={(e) => { e.stopPropagation(); startConnection(place.id); }}
-          onContextMenu={(e) => { e.preventDefault(); completeConnection(place.id); }} />
-      ))}
-
-      {transitions.map((transition) => (
-        <rect key={transition.id} x={transition.x - 10} y={transition.y - 20} width="20" height="40" fill="black"
-          onClick={(e) => { e.stopPropagation(); startConnection(transition.id); }}
-          onContextMenu={(e) => { e.preventDefault(); completeConnection(transition.id); }} />
-      ))}
-    </svg>
-  );
-};
-
-export default App;*/
-
-
-
-
 import React, { useState } from "react";
 import usePetriNet from "./components/PetriNet.js";
 import Topbar from "./components/Topbar.js";
@@ -99,7 +42,7 @@ const App = () => {
   };
 
   const handleMouseMove = (e) => {
-    if (draggingArc) {
+    if (draggingArc || connectingFrom) {
       setMousePos({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
     }
   };
@@ -178,7 +121,7 @@ const App = () => {
             const fromRadius = from.id.startsWith("P") ? PLACE_RADIUS : TRANSITION_WIDTH/2;
             const toRadius = to.id.startsWith("P") ? PLACE_RADIUS : TRANSITION_WIDTH/2;
 
-            //adjuste start and end points
+            //adjust start and end points
             const x1 = from.x + ux * fromRadius;
             const y1 = from.y + uy * fromRadius;
             const x2 = to.x - ux * toRadius;
@@ -191,21 +134,21 @@ const App = () => {
           })}
 
           {/* Temporary arc preview while connecting */}
-          {connectingFrom && mousePos && (
+          {/*connectingFrom && mousePos && (
             <line x1={places.find((p) => p.id === connectingFrom)?.x || transitions.find((t) => t.id === connectingFrom)?.x}
                   y1={places.find((p) => p.id === connectingFrom)?.y || transitions.find((t) => t.id === connectingFrom)?.y}
-                  x2={mousePos.x} y2={mousePos.y}
-          /*draggingArc && mousePos && (
+                  x2={mousePos.x} y2={mousePos.y}*/
+          draggingArc && mousePos && (
             <line x1={places.find((p) => p.id === draggingArc)?.x || transitions.find((t) => t.id === draggingArc)?.x}
                   y1={places.find((p) => p.id === draggingArc)?.y || transitions.find((t) => t.id === draggingArc)?.y}
-                  x2={mousePos.x} y2={mousePos.y}*/
+                  x2={mousePos.x} y2={mousePos.y}
                   stroke="gray" strokeWidth={BORDER_SIZE} strokeDasharray="5,5" />
           )}
 
           {/* Places */}
           {places.map((place) => (
             <circle key={place.id} cx={place.x} cy={place.y} r={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE}
-            onClick={(e) => {
+           /* onClick={(e) => {
               e.stopPropagation();
               if (mode === "arc") {
                 if (connectingFrom) {
@@ -215,9 +158,9 @@ const App = () => {
                   startConnection(place.id);
                 }
               }
-}}  
-            /*onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(place.id); }}
-            onMouseUp={(e) => { e.stopPropagation(); handleMouseUp(place.id); }}*/
+            }}  */
+            onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(place.id); }}
+            onMouseUp={(e) => { e.stopPropagation(); handleMouseUp(place.id); }}
           />
           ))}
 
@@ -225,7 +168,7 @@ const App = () => {
           {transitions.map((transition) => (
             <rect key={transition.id} x={transition.x - TRANSITION_WIDTH/2} y={transition.y - TRANSITION_HEIGHT/2}
             width={TRANSITION_WIDTH} height={TRANSITION_HEIGHT} fill="white" stroke="black" strokeWidth={BORDER_SIZE}
-            onClick={(e) => {
+            /*onClick={(e) => {
               e.stopPropagation();
               if (mode === "arc") {
                 if (connectingFrom) {
@@ -235,11 +178,9 @@ const App = () => {
                   startConnection(transition.id);
                 }
               }
-            }
-
-          }
-          /*onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(transition.id); }}
-              onMouseUp={(e) => { e.stopPropagation(); handleMouseUp(transition.id); }}*//>
+            }}*/
+          onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(transition.id); }}
+              onMouseUp={(e) => { e.stopPropagation(); handleMouseUp(transition.id); }}/>
           ))}
         </svg>
         <Properties />
@@ -251,24 +192,56 @@ const App = () => {
 export default App;
 
 
+/*import React, { useState } from "react";
+import usePetriNet from "./components/PetriNet.js";
 
+const App = () => {
+  const { places, transitions, arcs, addPlace, addTransition, addArc } = usePetriNet();
+  const [connecting, setConnecting] = useState(null);
 
-/*import React, { useState } from 'react';
-import PetriNetCanvas from './components/PetriNetCanvas.js';
+  const CanvasClick = (e) => {
+    const { offsetX, offsetY } = e.nativeEvent;
+    if (e.shiftKey) {
+      addTransition(offsetX, offsetY);
+    } else {
+      addPlace(offsetX, offsetY);
+    }
+  };
 
-function App() {
-  const [currentTool, setCurrentTool] = useState('place'); // Initial tool is 'place'
+  const startConnection = (id) => {
+    setConnecting(id);
+  };
+
+  const completeConnection = (id) => {
+    if (connecting && id !== connecting) {
+      addArc(connecting, id);
+      setConnecting(null);
+    }
+  };
 
   return (
-    <div className="App">
-      <div id="menu">
-        <button onClick={() => setCurrentTool('place')}>Add Place</button>
-        <button onClick={() => setCurrentTool('transition')}>Add Transition</button>
-        <button onClick={() => setCurrentTool('arc')}>Add Arc</button>
-      </div>
-      <PetriNetCanvas currentTool={currentTool} />
-    </div>
+    <svg width="100vw" height="100vh" onClick={CanvasClick}>
+      {arcs.map((arc, index) => {
+        const from = [...places, ...transitions].find((el) => el.id === arc.from);
+        const to = [...places, ...transitions].find((el) => el.id === arc.to);
+        return from && to ? (
+          <line key={index} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="black" strokeWidth="2" />
+        ) : null;
+      })}
+
+      {places.map((place) => (
+        <circle key={place.id} cx={place.x} cy={place.y} r="20" fill="white" stroke="black"
+          onClick={(e) => { e.stopPropagation(); startConnection(place.id); }}
+          onContextMenu={(e) => { e.preventDefault(); completeConnection(place.id); }} />
+      ))}
+
+      {transitions.map((transition) => (
+        <rect key={transition.id} x={transition.x - 10} y={transition.y - 20} width="20" height="40" fill="black"
+          onClick={(e) => { e.stopPropagation(); startConnection(transition.id); }}
+          onContextMenu={(e) => { e.preventDefault(); completeConnection(transition.id); }} />
+      ))}
+    </svg>
   );
-}
+};
 
 export default App;*/

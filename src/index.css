@@ -6,23 +6,38 @@ body{
 }
 
 body {
-    font-family: 'Trebuchet MS', sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     display: flex;
     justify-content: center;
+    overflow: hidden;
 }
 
 .top-bar {
     height: 50px;
     background-color: #ededed;
     border-bottom: 1px solid black;
+    align-content: center;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+}
+
+.top-bar :nth-child {
+    margin-left: 20px;
+}
+
+.top-bar > .name, .edit, .play {
+    appearance: none;
+    margin-left: 20px;
 }
 
 .container {
     display: flex;
     width: 100vw;
     /*max-width: 1200px;*/
-    /*min-width: 600px;*/
-    height: 100vh;
+    min-width: 600px;
+    height: calc(100vh - 50px);
 }
 
 .canvas {
@@ -52,10 +67,10 @@ body {
     border-left: 1px solid black;
 }
 
-.bg-gray-300 {
+.bg-gray {
     background-color: lightgray;
 }
 
-.bg-blue-400 {
+.bg-blue {
     background-color: lightblue;
 }
