@@ -44,7 +44,9 @@ const App = () => {
   const handleMouseMove = (e) => {
     if (draggingArc || connectingFrom) {
       setMousePos({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
-    }
+    }else {
+      setMousePos(null); // Hide the temp arc when no connection active
+  }
   };
 
   /*const handleMouseMove = (e) => {
@@ -160,7 +162,18 @@ const App = () => {
               }
             }}  */
             onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(place.id); }}
-            onMouseUp={(e) => { e.stopPropagation(); handleMouseUp(place.id); }}
+            onMouseUp={(e) => {
+              e.stopPropagation();
+              handleMouseUp(place.id);
+              //if (mode === "arc") {
+                if (connectingFrom) {
+                  completeConnection(place.id);
+                  setMousePos(null); // Clears the preview line
+                } else {
+                  startConnection(place.id);
+                }
+              //}
+            }}
           />
           ))}
 
@@ -179,8 +192,19 @@ const App = () => {
                 }
               }
             }}*/
-          onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(transition.id); }}
-              onMouseUp={(e) => { e.stopPropagation(); handleMouseUp(transition.id); }}/>
+            onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(transition.id); }}
+            onMouseUp={(e) => {
+              e.stopPropagation();
+              handleMouseUp(transition.id);
+              //if (mode === "arc") {
+                if (connectingFrom) {
+                  completeConnection(transition.id);
+                  setMousePos(null); // Clears the preview line
+                } else {
+                  startConnection(transition.id);
+                }
+              //}
+            }}/>
           ))}
         </svg>
         <Properties />
