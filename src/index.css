@@ -36,7 +36,7 @@ body {
     margin-left: 20px;
 }
 
-.play-button .edit-button {
+.play-button, .edit-button {
     cursor: pointer;
 }
 
@@ -79,9 +79,11 @@ body {
 }
 
 .bg-gray {
+    cursor: pointer;
     background-color: lightgray;
 }
 
 .bg-blue {
+    cursor: pointer;
     background-color: lightblue;
 }

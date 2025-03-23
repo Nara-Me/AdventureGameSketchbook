@@ -57,6 +57,41 @@ const App = () => {
     }};    
   };*/
 
+  const lineIntersectionOnRect = (width, height, xB, yB, xA, yA) => {
+    const w = width / 2 ;
+    const h = height / 2;
+    const dx = xA - xB;
+    const dy = yA - yB;
+
+    //if A=B return B itself
+    if (dx == 0 && dy == 0) return {
+      x: xB,
+      y: yB
+    };
+    const tan_phi = h / w;
+    const tan_theta = Math.abs(dy / dx);
+  
+    //tell me in which quadrant the A point is
+    const qx = Math.sign(dx);
+    const qy = Math.sign(dy);
+
+    let xI = 0, yI = 0;
+  
+    if (tan_theta > tan_phi) {
+      xI = xB + (h / tan_theta) * qx;
+      yI = yB + h * qy;
+    } else {
+      xI = xB + w * qx;
+      yI = yB + w * tan_theta * qy;
+    }
+  
+    return {
+      x: xI,
+      y: yI
+    };
+      
+  }
+
   const calculateEdgePoint = (from, to) => { //properly connect elements
     const dx = to.x - from.x;
     const dy = to.y - from.y;
@@ -66,20 +101,37 @@ const App = () => {
   
     let fromOffsetX = 0, fromOffsetY = 0, toOffsetX = 0, toOffsetY = 0;
   
-    if (from.type === "place") {
+    if (from.type === "place") { //radius for places
       fromOffsetX = PLACE_RADIUS * ux;
       fromOffsetY = PLACE_RADIUS * uy;
-    } else {
-      fromOffsetX = (TRANSITION_WIDTH / 2) * (dx > 0 ? 1 : -1);
-      fromOffsetY = (TRANSITION_HEIGHT / 2) * (dy > 0 ? 1 : -1);
+    } else { //middle face for transitions
+      const halfWidth = TRANSITION_WIDTH / 2 ;
+      const halfHeight = TRANSITION_HEIGHT / 2;
+  
+      if (Math.abs(dx) > Math.abs(dy)) {
+        fromOffsetX = dx > 0 ? halfWidth : -halfWidth;
+      } else {
+        fromOffsetY = dy > 0 ? halfHeight : -halfHeight;
+      }
     }
   
     if (to.type === "place") {
-      toOffsetX = PLACE_RADIUS * ux;
-      toOffsetY = PLACE_RADIUS * uy;
+      //toOffsetX = -(PLACE_RADIUS+(BORDER_SIZE*5)) * ux; toOffsetY = -(PLACE_RADIUS+(BORDER_SIZE*5)) * uy;
+      fromOffsetX = PLACE_RADIUS * ux; fromOffsetY = PLACE_RADIUS * uy;
     } else {
-      toOffsetX = (TRANSITION_WIDTH / 2) * (dx > 0 ? -1 : 1);
-      toOffsetY = (TRANSITION_HEIGHT / 2) * (dy > 0 ? -1 : 1);
+      /*const halfWidth = (TRANSITION_WIDTH / 2) +10;
+      const halfHeight = (TRANSITION_HEIGHT / 2) +10;*/
+      const halfWidth = TRANSITION_WIDTH / 2;
+      const halfHeight = TRANSITION_HEIGHT / 2;
+  
+      if (Math.abs(dx) > Math.abs(dy)) {
+        toOffsetX = dx > 0 ? -halfWidth : halfWidth;
+      } else {
+        toOffsetY = dy > 0 ? -halfHeight : halfHeight;
+      }
+      let coords = lineIntersectionOnRect(TRANSITION_WIDTH, TRANSITION_HEIGHT, dx, dy, from.x + fromOffsetX, from.y + fromOffsetY);
+      console.log(coords);
+      console.log(to.x + toOffsetX + " and " + to.y + toOffsetY);
     }
   
     return {
@@ -96,56 +148,7 @@ const App = () => {
       <div class="container">
         <Toolbar />
         <svg class="canvas" onClick={CanvasClick} onMouseMove={handleMouseMove}>
-          {/* Arrowhead */}
-          <defs>
-            <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto" markerUnits="strokeWidth">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="black" />
-            </marker>
-          </defs>
-
-          {/* Arcs (with arrow) */}
-          {arcs.map((arc, index) => {
-            const from = [...places, ...transitions].find((el) => el.id === arc.from);
-            const to = [...places, ...transitions].find((el) => el.id === arc.to);
-
-            if (!from || !to) return null;
-
-            //vector direction
-            const dx = to.x - from.x;
-            const dy = to.y - from.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-
-            //normalize vector
-            const ux = dx / length;
-            const uy = dy / length;
-
-            //
-            const fromRadius = from.id.startsWith("P") ? PLACE_RADIUS : TRANSITION_WIDTH/2;
-            const toRadius = to.id.startsWith("P") ? PLACE_RADIUS : TRANSITION_WIDTH/2;
-
-            //adjust start and end points
-            const x1 = from.x + ux * fromRadius;
-            const y1 = from.y + uy * fromRadius;
-            const x2 = to.x - ux * toRadius;
-            const y2 = to.y - uy * toRadius;
-
-            return (
-              <line key={index} x1={x1} y1={y1} x2={x2} y2={y2} stroke="black" strokeWidth={BORDER_SIZE} markerEnd="url(#arrow)" // Arrowhead always visible
-              />
-            );
-          })}
-
-          {/* Temporary arc preview while connecting */}
-          {/*connectingFrom && mousePos && (
-            <line x1={places.find((p) => p.id === connectingFrom)?.x || transitions.find((t) => t.id === connectingFrom)?.x}
-                  y1={places.find((p) => p.id === connectingFrom)?.y || transitions.find((t) => t.id === connectingFrom)?.y}
-                  x2={mousePos.x} y2={mousePos.y}*/
-          draggingArc && mousePos && (
-            <line x1={places.find((p) => p.id === draggingArc)?.x || transitions.find((t) => t.id === draggingArc)?.x}
-                  y1={places.find((p) => p.id === draggingArc)?.y || transitions.find((t) => t.id === draggingArc)?.y}
-                  x2={mousePos.x} y2={mousePos.y}
-                  stroke="gray" strokeWidth={BORDER_SIZE} strokeDasharray="5,5" />
-          )}
+          
 
           {/* Places */}
           {places.map((place) => (
@@ -206,8 +209,65 @@ const App = () => {
               //}
             }}/>
           ))}
+
+          {/* Arrowhead */}
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="strokeWidth">
+              <path d="M 0 0 L 10 5 L 0 10 L 5 5 z" fill="black"/>
+            </marker>
+          </defs>
+
+          {/* Arcs (with arrow) */}
+          {arcs.map((arc, index) => {
+            const from = [...places, ...transitions].find((el) => el.id === arc.from);
+            const to = [...places, ...transitions].find((el) => el.id === arc.to);
+
+            if (!from || !to) return null;
+              
+            const { x1, y1, x2, y2 } = calculateEdgePoint(from, to);
+
+            //vector direction
+            /*const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+
+            //normalize vector
+            const ux = dx / length;
+            const uy = dy / length;
+
+            //
+            const fromRadius = from.id.startsWith("P") ? PLACE_RADIUS : TRANSITION_WIDTH/2;
+            const toRadius = to.id.startsWith("P") ? PLACE_RADIUS : TRANSITION_WIDTH/2;
+
+            //adjust start and end points
+            const x1 = from.x + ux * fromRadius;
+            const y1 = from.y + uy * fromRadius;
+            const x2 = to.x - ux * toRadius;
+            const y2 = to.y - uy * toRadius;*/
+
+            return (
+              <line key={index} x1={x1} y1={y1} x2={x2} y2={y2} stroke="black" strokeWidth={BORDER_SIZE} markerEnd="url(#arrow)" // Arrowhead always visible
+              />
+            );
+            /*return (
+              <line key={index} x1={x1} y1={y1} x2={x2} y2={y2} stroke="black" strokeWidth={BORDER_SIZE} markerEnd="url(#arrow)" // Arrowhead always visible
+              />
+            );*/
+          })}
+
+          {/* Temporary arc preview while connecting */}
+          {/*connectingFrom && mousePos && (
+            <line x1={places.find((p) => p.id === connectingFrom)?.x || transitions.find((t) => t.id === connectingFrom)?.x}
+                  y1={places.find((p) => p.id === connectingFrom)?.y || transitions.find((t) => t.id === connectingFrom)?.y}
+                  x2={mousePos.x} y2={mousePos.y}*/
+          draggingArc && mousePos && (
+            <line x1={places.find((p) => p.id === draggingArc)?.x || transitions.find((t) => t.id === draggingArc)?.x}
+                  y1={places.find((p) => p.id === draggingArc)?.y || transitions.find((t) => t.id === draggingArc)?.y}
+                  x2={mousePos.x} y2={mousePos.y}
+                  stroke="gray" strokeWidth={BORDER_SIZE} strokeDasharray="5,5" />
+          )}
         </svg>
-        <Properties />
+        {/*<Properties />*/}
       </div>
     </div>
   );

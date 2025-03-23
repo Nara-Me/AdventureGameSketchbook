@@ -5,7 +5,7 @@ const Toolbar = () => {
   const { setMode, mode } = usePetriNet();
   
   return (
-    <div className=" tools-sidebar">
+    <div className="tools-sidebar">
       <button className={`${mode === "place" ? "bg-blue" : "bg-gray"}`} onClick={() => setMode("place")}>
         Place
       </button>

@@ -33,12 +33,12 @@ const usePetriNet = create((set) => ({
   
   addPlace: (x, y) =>
     set((state) => ({
-      places: [...state.places, { id: `P${state.places.length + 1}`, x, y, tokens: 1 }],
+      places: [...state.places, { id: `P${state.places.length + 1}`, x, y, tokens: 1 , type: "place"}],
     })),
 
   addTransition: (x, y) =>
     set((state) => ({
-      transitions: [...state.transitions, { id: `T${state.transitions.length + 1}`, x, y }],
+      transitions: [...state.transitions, { id: `T${state.transitions.length + 1}`, x, y , type: "transition"}],
     })),
 
   startConnection: (id) =>

@@ -4,7 +4,7 @@ const Properties = () => {
   
   return (
     <div className="properties-sidebar">
-      <div>Properties</div>
+      <div>Properties</div><br></br>
       <div>
         <div>Name</div>
         <div>Position</div>
