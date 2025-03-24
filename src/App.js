@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { Stage, Layer, Circle, Rect, Arrow } from "react-konva";
+import { Stage, Layer, Circle, Rect, Arrow, Text } from "react-konva";
 
 import Topbar from "./components/Topbar.js";
 //import Toolbar from "./components/Toolbar.js";
 import Properties from "./components/Propertybar.js";
 
-const PetriNetEditor = () => {
+const App = () => {
   const BORDER_SIZE = 2;
   const PLACE_RADIUS = 20;
   const TRANSITION_WIDTH = 80;
@@ -15,6 +15,7 @@ const PetriNetEditor = () => {
   const [transitions, setTransitions] = useState([]);
   const [arcs, setArcs] = useState([]);
   const [selectedTool, setSelectedTool] = useState("place");
+  const [mode, setMode] = useState("edit"); // Modes: "edit", "run"
   const [contextMenu, setContextMenu] = useState(null);
   const [connectingFrom, setConnectingFrom] = useState(null);
   const [nextPlaceId, setNextPlaceId] = useState(1);
@@ -22,19 +23,19 @@ const PetriNetEditor = () => {
 
   const isOverlapping = (x, y) => {
     return (
-      places.some((p) => Math.hypot(p.x - x, p.y - y) < 30) ||
-      transitions.some((t) => Math.abs(t.x - x) < 20 && Math.abs(t.y - y) < 40)
+      places.some((p) => Math.hypot(p.x - x, p.y - y) < PLACE_RADIUS+10) ||
+      transitions.some((t) => Math.abs(t.x - x) < TRANSITION_WIDTH / 2 && Math.abs(t.y - y) < TRANSITION_HEIGHT / 2)
     );
   };
 
   const handleStageClick = (e) => {
-    if (e.evt.button !== 0) return;
+    if (e.evt.button !== 0 || mode !== "edit") return;
     
     const { x, y } = e.target.getStage().getPointerPosition();
     if (isOverlapping(x, y)) return;
 
     if (selectedTool === "place") {
-      setPlaces([...places, { id: `p${nextPlaceId}`, x, y }]);
+      setPlaces([...places, { id: `p${nextPlaceId}`, x, y, tokens: 0 }]);
       setNextPlaceId(nextPlaceId + 1);
     } else if (selectedTool === "transition") {
       setTransitions([...transitions, { id: `t${nextTransitionId}`, x, y }]);
@@ -43,25 +44,30 @@ const PetriNetEditor = () => {
   };
 
   const handleElementClick = (id, type) => {
+    if (mode === "run" && type === "transition") {
+      fireTransition(id);
+      return;
+    }
+
     if (selectedTool !== "arc") {
       setConnectingFrom(null);
       console.log("NO");
       return;
     }
     
-    if (!connectingFrom) {
+    if (!connectingFrom) { //working spaguetti (NOT ANYMORE AAAAAAA)
       setConnectingFrom({ id, type });
     } else if (connectingFrom.id !== id && connectingFrom.type !== type) {
-      //console.log("connected");
+      console.log("connected");
       setArcs([...arcs, { from: connectingFrom, to: { id, type } }]);
       setConnectingFrom(null);
     } else if (connectingFrom.id === id || connectingFrom.type === type) {
       setConnectingFrom(null);
       setConnectingFrom({ id, type });
-      //console.log("connection restarted");
+      console.log("connection restarted");
       return;
     } else {  //just in case
-      //console.log("connection cancelled");
+      console.log("connection cancelled");
       setConnectingFrom(null);
     }
   };
@@ -85,12 +91,10 @@ const PetriNetEditor = () => {
     setConnectingFrom(null);
     if (!contextMenu) return;
     const { id, type } = contextMenu;
-    if (type === "arc") { // fixing the fucking line arrow thingy
-      //setArcs(arcs.filter((arc) => arc !== id));
-      setArcs(arcs.filter((arc) => arc.from.id !== id && arc.to.id !== id));
-      console.log(id, arcs.length);
+    if (type === "arc") {
+      setArcs(arcs.filter((_, index) => index !== id));
     } else {
-      //console.log("deleted element");
+      //console.log(id);
       setPlaces(places.filter((p) => p.id !== id));
       setTransitions(transitions.filter((t) => t.id !== id));
       //setArcs(arcs.filter((arc) => arc !== id));
@@ -99,9 +103,30 @@ const PetriNetEditor = () => {
     setContextMenu(null);
   };
 
+
+  const fireTransition = (transitionId) => {
+    const inputPlaces = arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
+    const outputPlaces = arcs.filter((arc) => arc.from.id === transitionId).map((arc) => arc.to.id);
+    
+    if (inputPlaces.some((id) => (places.find((p) => p.id === id)?.tokens || 0) < 1)) return;
+    
+    setPlaces((prev) =>
+      prev.map((p) =>
+        inputPlaces.includes(p.id)
+          ? { ...p, tokens: p.tokens - 1 }
+          : outputPlaces.includes(p.id)
+          ? { ...p, tokens: p.tokens + 1 }
+          : p
+      )
+    );
+  };
+
   return (
     <div>
       <Topbar />
+      <button onClick={() => setMode(mode === "edit" ? "run" : "edit")}>
+        {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
+      </button>
       <select value={selectedTool} onChange={(e) => setSelectedTool(e.target.value)}>
         <option value="place">Place</option>
         <option value="transition">Transition</option>
@@ -112,6 +137,7 @@ const PetriNetEditor = () => {
       <Stage className="canvas" width={800} height={600} onClick={handleStageClick}>
         <Layer>
           {places.map((p) => (
+            <>
             <Circle
               key={p.id}
               x={p.x}
@@ -123,12 +149,15 @@ const PetriNetEditor = () => {
               onDragMove={(e) => handleDragMove(e, p.id, "place")}
               onContextMenu={(e) => handleContextMenu(e, p.id, "place")}
             />
+            <Text /*key={null}*/ x={p.x - 5} y={p.y - 5} text={p.tokens.toString()} fontSize={14} fill="black" />
+            </>
           ))}
           {transitions.map((t) => (
+            <>
             <Rect
               key={t.id}
-              x={t.x - TRANSITION_WIDTH/2}
-              y={t.y - TRANSITION_HEIGHT/2}
+              x={t.x - (TRANSITION_WIDTH/2)} //STOP JITTERING AAAAAA
+              y={t.y - (TRANSITION_HEIGHT/2)}
               width={TRANSITION_WIDTH} height={TRANSITION_HEIGHT}
               fill="white" stroke="black" strokeWidth={BORDER_SIZE}
               draggable//={selectedTool !== "arc"}
@@ -136,6 +165,8 @@ const PetriNetEditor = () => {
               onDragMove={(e) => handleDragMove(e, t.id, "transition")}
               onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
             />
+            <Text /*key={null}*/ x={t.x - 5} y={t.y - 5} text={"Action"} fontSize={14} fill="black" />
+            </>
           ))}
           {arcs.map((arc, index) => (
             <Arrow
@@ -166,7 +197,7 @@ const PetriNetEditor = () => {
   );
 };
 
-export default PetriNetEditor;
+export default App;
 
 
 //import React, { useState } from "react";
