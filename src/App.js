@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Stage, Layer, Circle, Rect, Arrow, Text } from "react-konva";
+import { Stage, Layer, Circle, Rect, Arrow, Text, Group } from "react-konva";
 
 import Topbar from "./components/Topbar.js";
 //import Toolbar from "./components/Toolbar.js";
@@ -8,15 +8,15 @@ import Properties from "./components/Propertybar.js";
 const App = () => {
   const BORDER_SIZE = 2;
   const PLACE_RADIUS = 20;
-  const TRANSITION_WIDTH = 80;
+  const TRANSITION_WIDTH = 100;
   const TRANSITION_HEIGHT = 40;
 
   const [places, setPlaces] = useState([]);
   const [transitions, setTransitions] = useState([]);
   const [arcs, setArcs] = useState([]);
-  const [selectedTool, setSelectedTool] = useState("place");
+  const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows
   const [mode, setMode] = useState("edit"); // Modes: "edit", "run"
-  const [contextMenu, setContextMenu] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null); // delete and
   const [connectingFrom, setConnectingFrom] = useState(null);
   const [nextPlaceId, setNextPlaceId] = useState(1);
   const [nextTransitionId, setNextTransitionId] = useState(1);
@@ -28,11 +28,42 @@ const App = () => {
     );
   };
 
+  const calculateArrowPoints = (from, to) => {
+    const fromElement = places.find((p) => p.id === from.id) || transitions.find((t) => t.id === from.id);
+    const toElement = places.find((p) => p.id === to.id) || transitions.find((t) => t.id === to.id);
+    if (!fromElement || !toElement) return [];
+
+    let { x: x1, y: y1 } = fromElement;
+    let { x: x2, y: y2 } = toElement;
+
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+
+    if (from.type === "place") {
+      x1 += PLACE_RADIUS * Math.cos(angle);
+      y1 += PLACE_RADIUS * Math.sin(angle);
+    } else if (from.type === "transition") {
+      x1 += (TRANSITION_WIDTH / 2) + (TRANSITION_WIDTH / 2) * Math.cos(angle);
+      y1 += (TRANSITION_HEIGHT / 2) + (TRANSITION_HEIGHT / 2) * Math.sin(angle);
+    }
+
+    if (to.type === "place") {
+      x2 -= PLACE_RADIUS * Math.cos(angle);
+      y2 -= PLACE_RADIUS * Math.sin(angle);
+    } else if (to.type === "transition") {
+      x2 -= (-TRANSITION_WIDTH / 2) + (TRANSITION_WIDTH / 2) * Math.cos(angle);
+      y2 -= (-TRANSITION_HEIGHT / 2) + (TRANSITION_HEIGHT / 2) * Math.sin(angle);
+    }
+
+    return [x1, y1, x2, y2];
+  };
+
   const handleStageClick = (e) => {
+    setContextMenu(null);
     if (e.evt.button !== 0 || mode !== "edit") return;
     
     const { x, y } = e.target.getStage().getPointerPosition();
     if (isOverlapping(x, y)) return;
+    //else console.log("cancelled");//setConnectingFrom(null);
 
     if (selectedTool === "place") {
       setPlaces([...places, { id: `p${nextPlaceId}`, x, y, tokens: 0 }]);
@@ -40,6 +71,9 @@ const App = () => {
     } else if (selectedTool === "transition") {
       setTransitions([...transitions, { id: `t${nextTransitionId}`, x, y }]);
       setNextTransitionId(nextTransitionId + 1);
+    /*} else if (selectedTool === "arc") { //for removing arrows
+      console.log("cancelled");
+      setConnectingFrom(null);*/
     }
   };
 
@@ -55,7 +89,7 @@ const App = () => {
       return;
     }
     
-    if (!connectingFrom) { //working spaguetti (NOT ANYMORE AAAAAAA)
+    if (!connectingFrom) { //working spaguetti
       setConnectingFrom({ id, type });
     } else if (connectingFrom.id !== id && connectingFrom.type !== type) {
       console.log("connected");
@@ -78,6 +112,16 @@ const App = () => {
       setPlaces((prev) => prev.map((p) => (p.id === id ? { ...p, x, y } : p)));
     } else if (type === "transition") {
       setTransitions((prev) => prev.map((t) => (t.id === id ? { ...t, x, y } : t)));
+      /*setTransitions((prev) => //centers the rectangle but jitters AAAA
+        prev.map((t) => {
+          if (t.id === id) {
+            const newX = x - (TRANSITION_WIDTH / 2);
+            const newY = y - (TRANSITION_HEIGHT / 2);
+            return { ...t, x: newX, y: newY };
+          }
+          return t;
+        })
+      );*/
     }
   };
 
@@ -97,12 +141,10 @@ const App = () => {
       //console.log(id);
       setPlaces(places.filter((p) => p.id !== id));
       setTransitions(transitions.filter((t) => t.id !== id));
-      //setArcs(arcs.filter((arc) => arc !== id));
       setArcs(arcs.filter((arc) => arc.from.id !== id && arc.to.id !== id));
     }
     setContextMenu(null);
   };
-
 
   const fireTransition = (transitionId) => {
     const inputPlaces = arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
@@ -127,11 +169,22 @@ const App = () => {
       <button onClick={() => setMode(mode === "edit" ? "run" : "edit")}>
         {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
       </button>
-      <select value={selectedTool} onChange={(e) => setSelectedTool(e.target.value)}>
-        <option value="place">Place</option>
-        <option value="transition">Transition</option>
-        <option value="arc">Arc</option>
-      </select>
+      <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+        <div
+          style={{ width: 40, height: 40, borderRadius: "50%", background: selectedTool === "place" ? "gray" : "white", border: "2px solid black", cursor: "pointer" }}
+          onClick={() => setSelectedTool(selectedTool === "place" ? null : "place")}
+        ></div>
+        <div
+          style={{ width: 40, height: 40, background: selectedTool === "transition" ? "gray" : "white", border: "2px solid black", cursor: "pointer" }}
+          onClick={() => setSelectedTool(selectedTool === "transition" ? null : "transition")}
+        ></div>
+        <div
+          style={{ width: 40, height: 20, background: selectedTool === "arc" ? "gray" : "white", border: "2px solid black", cursor: "pointer" }}
+          onClick={() => setSelectedTool(selectedTool === "arc" ? null : "arc")}
+        ></div>
+        
+      </div>
+
       {/*<Toolbar />*/}
       <div className="container">
       <Stage className="canvas" width={800} height={600} onClick={handleStageClick}>
@@ -156,28 +209,30 @@ const App = () => {
             <>
             <Rect
               key={t.id}
-              x={t.x - (TRANSITION_WIDTH/2)} //STOP JITTERING AAAAAA
-              y={t.y - (TRANSITION_HEIGHT/2)}
+              //x={t.x - (TRANSITION_WIDTH/2)} //STOP JITTERING AAAAAA
+              //y={t.y - (TRANSITION_HEIGHT/2)}
+              x={t.x}
+              y={t.y}
               width={TRANSITION_WIDTH} height={TRANSITION_HEIGHT}
               fill="white" stroke="black" strokeWidth={BORDER_SIZE}
+              //lineCap="round"
+              cornerRadius={5}
               draggable//={selectedTool !== "arc"}
               onClick={() => handleElementClick(t.id, "transition")}
               onDragMove={(e) => handleDragMove(e, t.id, "transition")}
               onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
             />
-            <Text /*key={null}*/ x={t.x - 5} y={t.y - 5} text={"Action"} fontSize={14} fill="black" />
+            <Text /*key={null}*/ x={t.x + (TRANSITION_WIDTH/2)} y={t.y + (TRANSITION_HEIGHT/2)-5} text={"Action"} fontSize={14} fill="black" />
             </>
           ))}
           {arcs.map((arc, index) => (
             <Arrow
               key={index}
-              points={[
-                places.find((p) => p.id === arc.from.id)?.x || transitions.find((t) => t.id === arc.from.id)?.x,
-                places.find((p) => p.id === arc.from.id)?.y || transitions.find((t) => t.id === arc.from.id)?.y,
-                places.find((p) => p.id === arc.to.id)?.x || transitions.find((t) => t.id === arc.to.id)?.x,
-                places.find((p) => p.id === arc.to.id)?.y || transitions.find((t) => t.id === arc.to.id)?.y,
-              ]}
+              points={calculateArrowPoints(arc.from, arc.to)}
               stroke="black"
+              fill="white"
+              //lineCap="round"
+              lineJoin="round"
               strokeWidth={BORDER_SIZE}
               onContextMenu={(e) => handleContextMenu(e, index, "arc")}
             />
