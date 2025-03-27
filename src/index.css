@@ -27,17 +27,13 @@ body {
     justify-content: flex-start;
 }
 
-.top-bar :nth-child {
+.top-bar > .name, .play-button {
     margin-left: 20px;
-}
-
-.top-bar > .name, .edit-button, .play-button {
-    /*appearance: none;*/
-    margin-left: 20px;
-}
-
-.play-button, .edit-button {
+    background: none;
+    border: none;
     cursor: pointer;
+    display: flex;
+    align-items: center;
 }
 
 .container {

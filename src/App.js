@@ -1,22 +1,79 @@
-import React, { useState } from "react";
-import { Stage, Layer, Circle, Rect, Arrow, Text, Group } from "react-konva";
+/*
+to do (for now)
+fix arrow bugs - arrow position
+               - arrow connection cancelling
+fix place and transition drag - by making the text inside part of the dragable group
+fix everything about the UI lol
+make the properties panel - appear
+                          - and work
+associate images and sounds to places and actions
+fix the firing of tokens - make it non-deterministic
+*/
+
+import React, { useState, useRef } from "react";
+import { Stage, Layer, Circle, Rect, Arrow, Text, Image } from "react-konva";
+import useImage from "use-image";
 
 import Topbar from "./components/Topbar.js";
-//import Toolbar from "./components/Toolbar.js";
+import Toolbar from "./components/Toolbar.js";
 import Properties from "./components/Propertybar.js";
+/*import { usePlaceState, useTransitionState, useArcState, useModeState } from "./components/hooks.js";
+import { isOverlapping, calculateArrowPoints } from "./components/utils.js";
+import { handleWheel, handleStageClick } from "./components/actions.js";
+import { PlaceElement, TransitionElement, ArcElement } from ".components/elementsjs";*/
+
+// Predefined assets
+/*const assets = {
+  key: require("./assets/imgs/objects/RPG_key.png"),
+  door: require("./assets/imgs/objects/door.png"),
+  sound1: new Audio(require("./assets/audio/yippee-tbh-creature-jazz.mp3")),
+};*/
 
 const App = () => {
+  const GAP_SIZE = 7;
   const BORDER_SIZE = 2;
   const PLACE_RADIUS = 20;
   const TRANSITION_WIDTH = 100;
   const TRANSITION_HEIGHT = 40;
 
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const stageRef = useRef(null);
+
+  const handleWheel = (e) => {
+    e.evt.preventDefault();
+
+    const stage = stageRef.current;
+    const oldScale = stage.scaleX();
+    const pointer = stage.getPointerPosition();
+
+    const mousePointTo = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
+    };
+
+    // how to scale? Zoom in? Or zoom out?
+    let direction = e.evt.deltaY > 0 ? 1 : -1;
+
+    const scaleBy = 1.05;
+    const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
+
+    stage.scale({ x: newScale, y: newScale });
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
+    };
+    stage.position(newPos);
+  };
+
   const [places, setPlaces] = useState([]);
   const [transitions, setTransitions] = useState([]);
   const [arcs, setArcs] = useState([]);
-  const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows
   const [mode, setMode] = useState("edit"); // Modes: "edit", "run"
-  const [contextMenu, setContextMenu] = useState(null); // delete and
+
+  const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows
+  const [contextMenu, setContextMenu] = useState(null); // delete and TBA
   const [connectingFrom, setConnectingFrom] = useState(null);
   const [nextPlaceId, setNextPlaceId] = useState(1);
   const [nextTransitionId, setNextTransitionId] = useState(1);
@@ -39,19 +96,19 @@ const App = () => {
     const angle = Math.atan2(y2 - y1, x2 - x1);
 
     if (from.type === "place") {
-      x1 += PLACE_RADIUS * Math.cos(angle);
-      y1 += PLACE_RADIUS * Math.sin(angle);
+      x1 += (GAP_SIZE + PLACE_RADIUS) * Math.cos(angle);
+      y1 += (GAP_SIZE + PLACE_RADIUS) * Math.sin(angle);
     } else if (from.type === "transition") {
-      x1 += (TRANSITION_WIDTH / 2) + (TRANSITION_WIDTH / 2) * Math.cos(angle);
-      y1 += (TRANSITION_HEIGHT / 2) + (TRANSITION_HEIGHT / 2) * Math.sin(angle);
+      x1 += (TRANSITION_WIDTH / 2) + (GAP_SIZE + TRANSITION_WIDTH / 2) * Math.cos(angle);
+      y1 += (TRANSITION_HEIGHT / 2) + (GAP_SIZE + TRANSITION_HEIGHT / 2) * Math.sin(angle);
     }
 
     if (to.type === "place") {
-      x2 -= PLACE_RADIUS * Math.cos(angle);
-      y2 -= PLACE_RADIUS * Math.sin(angle);
+      x2 -= (GAP_SIZE + PLACE_RADIUS) * Math.cos(angle);
+      y2 -= (GAP_SIZE + PLACE_RADIUS) * Math.sin(angle);
     } else if (to.type === "transition") {
-      x2 -= (-TRANSITION_WIDTH / 2) + (TRANSITION_WIDTH / 2) * Math.cos(angle);
-      y2 -= (-TRANSITION_HEIGHT / 2) + (TRANSITION_HEIGHT / 2) * Math.sin(angle);
+      x2 -= (-TRANSITION_WIDTH / 2) + (GAP_SIZE + TRANSITION_WIDTH / 2) * Math.cos(angle);
+      y2 -= (-TRANSITION_HEIGHT / 2) + (GAP_SIZE + TRANSITION_HEIGHT / 2) * Math.sin(angle);
     }
 
     return [x1, y1, x2, y2];
@@ -63,7 +120,6 @@ const App = () => {
     
     const { x, y } = e.target.getStage().getPointerPosition();
     if (isOverlapping(x, y)) return;
-    //else console.log("cancelled");//setConnectingFrom(null);
 
     if (selectedTool === "place") {
       setPlaces([...places, { id: `p${nextPlaceId}`, x, y, tokens: 0 }]);
@@ -71,9 +127,6 @@ const App = () => {
     } else if (selectedTool === "transition") {
       setTransitions([...transitions, { id: `t${nextTransitionId}`, x, y }]);
       setNextTransitionId(nextTransitionId + 1);
-    /*} else if (selectedTool === "arc") { //for removing arrows
-      console.log("cancelled");
-      setConnectingFrom(null);*/
     }
   };
 
@@ -163,84 +216,86 @@ const App = () => {
     );
   };
 
+  /*const fireTransition = (transitionId) => {
+    const transition = transitions.find((t) => t.id === transitionId);
+    if (!transition) return;
+
+    const inputPlaces = arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
+    const outputPlaces = arcs.filter((arc) => arc.from.id === transitionId).map((arc) => arc.to.id);
+
+    if (inputPlaces.some((id) => (places.find((p) => p.id === id)?.tokens || 0) < 1)) return;
+
+    setPlaces((prev) =>
+      prev.map((p) =>
+        inputPlaces.includes(p.id)
+          ? { ...p, tokens: p.tokens - 1 }
+          : outputPlaces.includes(p.id)
+          ? { ...p, tokens: p.tokens + 1 }
+          : p
+      )
+    );
+
+    if (transition.action === "playSound") {
+      assets.sound1.play();
+    }
+  };*/
+
   return (
     <div>
-      <Topbar />
-      <button onClick={() => setMode(mode === "edit" ? "run" : "edit")}>
-        {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
-      </button>
-      <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
-        <div
-          style={{ width: 40, height: 40, borderRadius: "50%", background: selectedTool === "place" ? "gray" : "white", border: "2px solid black", cursor: "pointer" }}
-          onClick={() => setSelectedTool(selectedTool === "place" ? null : "place")}
-        ></div>
-        <div
-          style={{ width: 40, height: 40, background: selectedTool === "transition" ? "gray" : "white", border: "2px solid black", cursor: "pointer" }}
-          onClick={() => setSelectedTool(selectedTool === "transition" ? null : "transition")}
-        ></div>
-        <div
-          style={{ width: 40, height: 20, background: selectedTool === "arc" ? "gray" : "white", border: "2px solid black", cursor: "pointer" }}
-          onClick={() => setSelectedTool(selectedTool === "arc" ? null : "arc")}
-        ></div>
-        
-      </div>
-
-      {/*<Toolbar />*/}
+      <Topbar mode={mode} setMode={setMode} />
       <div className="container">
-      <Stage className="canvas" width={800} height={600} onClick={handleStageClick}>
-        <Layer>
-          {places.map((p) => (
-            <>
-            <Circle
-              key={p.id}
-              x={p.x}
-              y={p.y}
-              radius={PLACE_RADIUS}
-              fill="white" stroke="black" strokeWidth={BORDER_SIZE}
-              draggable//={selectedTool !== "arc"}
-              onClick={() => handleElementClick(p.id, "place")}
-              onDragMove={(e) => handleDragMove(e, p.id, "place")}
-              onContextMenu={(e) => handleContextMenu(e, p.id, "place")}
-            />
-            <Text /*key={null}*/ x={p.x - 5} y={p.y - 5} text={p.tokens.toString()} fontSize={14} fill="black" />
-            </>
-          ))}
-          {transitions.map((t) => (
-            <>
-            <Rect
-              key={t.id}
-              //x={t.x - (TRANSITION_WIDTH/2)} //STOP JITTERING AAAAAA
-              //y={t.y - (TRANSITION_HEIGHT/2)}
-              x={t.x}
-              y={t.y}
-              width={TRANSITION_WIDTH} height={TRANSITION_HEIGHT}
-              fill="white" stroke="black" strokeWidth={BORDER_SIZE}
-              //lineCap="round"
-              cornerRadius={5}
-              draggable//={selectedTool !== "arc"}
-              onClick={() => handleElementClick(t.id, "transition")}
-              onDragMove={(e) => handleDragMove(e, t.id, "transition")}
-              onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
-            />
-            <Text /*key={null}*/ x={t.x + (TRANSITION_WIDTH/2)} y={t.y + (TRANSITION_HEIGHT/2)-5} text={"Action"} fontSize={14} fill="black" />
-            </>
-          ))}
-          {arcs.map((arc, index) => (
-            <Arrow
-              key={index}
-              points={calculateArrowPoints(arc.from, arc.to)}
-              stroke="black"
-              fill="white"
-              //lineCap="round"
-              lineJoin="round"
-              strokeWidth={BORDER_SIZE}
-              onContextMenu={(e) => handleContextMenu(e, index, "arc")}
-            />
-          ))}
-        </Layer>
-      </Stage>
-      <Properties />
-      </div>
+      <Toolbar selectedTool={selectedTool} setSelectedTool={setSelectedTool} />
+        <Stage className="canvas" width={1000} height={height} onClick={handleStageClick} ref={stageRef} onWheel={handleWheel} /*draggable*/>
+          <Layer>
+            {places.map((p) => (
+              <>
+              <Circle
+                key={p.id}
+                x={p.x} y={p.y}
+                radius={PLACE_RADIUS}
+                fill="white" stroke="black" strokeWidth={BORDER_SIZE}
+                draggable
+                onClick={() => handleElementClick(p.id, "place")}
+                onDragMove={(e) => handleDragMove(e, p.id, "place")}
+                onContextMenu={(e) => handleContextMenu(e, p.id, "place")}
+              />
+              <Text /*key={null}*/ x={p.x - 5} y={p.y - 5} text={p.tokens.toString()} fontSize={14} fill="black" />
+              </>
+            ))}
+            {transitions.map((t) => (
+              <>
+              <Rect
+                key={t.id}
+                x={t.x} y={t.y}
+                width={TRANSITION_WIDTH} height={TRANSITION_HEIGHT}
+                fill="white" stroke="black" strokeWidth={BORDER_SIZE}
+                cornerRadius={5}
+                draggable
+                onClick={() => handleElementClick(t.id, "transition")}
+                onDragMove={(e) => handleDragMove(e, t.id, "transition")}
+                onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
+              />
+              <Text /*key={null}*/ x={t.x + (TRANSITION_WIDTH/4)} y={t.y + (TRANSITION_HEIGHT/2)-5} text={"Action"} fontSize={14} fill="black" />
+              </>
+            ))}
+            {arcs.map((arc, index) => (
+              <Arrow
+                key={index}
+                points={calculateArrowPoints(arc.from, arc.to)}
+                stroke="black" fill="white"
+                lineCap="round" lineJoin="round"
+                pointerLength={12} pointerWidth={15}
+                //dashEnabled dash={20}
+                //bezier="true" tension={5}
+                strokeWidth={BORDER_SIZE}
+                hitStrokeWidth={BORDER_SIZE+8}
+                onContextMenu={(e) => handleContextMenu(e, index, "arc")}
+              />
+            ))}
+          </Layer>
+        </Stage>
+        <Properties />
+        </div>
       {contextMenu && (
         <div
           style={{ position: "absolute", top: contextMenu.y, left: contextMenu.x, background: "white", padding: "5px", border: "1px solid black" }}
@@ -250,6 +305,45 @@ const App = () => {
       )}
     </div>
   );
+
+//return (
+//  <div>
+//    <Topbar />
+//    <button onClick={() => setMode(mode === "edit" ? "run" : "edit")}>
+//      {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
+//    </button>
+//    <Stage width={800} height={600}>
+//      <Layer>
+//        {places.map((p) => {
+//          const [image] = useImage(assets[p.asset]);
+//          return (
+//            <>
+//              <Circle key={p.id} x={p.x} y={p.y} radius={20} fill="white" stroke="black" strokeWidth={2} />
+//              {mode === "run" && image && <Image x={p.x - 15} y={p.y - 15} image={image} width={30} height={30} />}
+//              <Text x={p.x - 5} y={p.y - 5} text={p.tokens.toString()} fontSize={14} fill="black" />
+//            </>
+//          );
+//        })}
+//        {transitions.map((t) => (
+//          <Rect
+//            key={t.id}
+//            x={t.x}
+//            y={t.y}
+//            width={40}
+//            height={40}
+//            fill="white"
+//            stroke="black"
+//            strokeWidth={2}
+//            onClick={() => mode === "run" && fireTransition(t.id)}
+//          />
+//        ))}
+//        {arcs.map((arc, index) => (
+//          <Arrow key={index} points={[100, 100, 300, 100]} stroke="black" fill="white" strokeWidth={2} />
+//        ))}
+//      </Layer>
+//    </Stage>
+//  </div>
+//);
 };
 
 export default App;
@@ -531,57 +625,3 @@ export default App;
 //};
 //
 //export default App;
-
-/*import React, { useState } from "react";
-import usePetriNet from "./components/PetriNet.js";
-
-const App = () => {
-  const { places, transitions, arcs, addPlace, addTransition, addArc } = usePetriNet();
-  const [connecting, setConnecting] = useState(null);
-
-  const CanvasClick = (e) => {
-    const { offsetX, offsetY } = e.nativeEvent;
-    if (e.shiftKey) {
-      addTransition(offsetX, offsetY);
-    } else {
-      addPlace(offsetX, offsetY);
-    }
-  };
-
-  const startConnection = (id) => {
-    setConnecting(id);
-  };
-
-  const completeConnection = (id) => {
-    if (connecting && id !== connecting) {
-      addArc(connecting, id);
-      setConnecting(null);
-    }
-  };
-
-  return (
-    <svg width="100vw" height="100vh" onClick={CanvasClick}>
-      {arcs.map((arc, index) => {
-        const from = [...places, ...transitions].find((el) => el.id === arc.from);
-        const to = [...places, ...transitions].find((el) => el.id === arc.to);
-        return from && to ? (
-          <line key={index} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="black" strokeWidth="2" />
-        ) : null;
-      })}
-
-      {places.map((place) => (
-        <circle key={place.id} cx={place.x} cy={place.y} r="20" fill="white" stroke="black"
-          onClick={(e) => { e.stopPropagation(); startConnection(place.id); }}
-          onContextMenu={(e) => { e.preventDefault(); completeConnection(place.id); }} />
-      ))}
-
-      {transitions.map((transition) => (
-        <rect key={transition.id} x={transition.x - 10} y={transition.y - 20} width="20" height="40" fill="black"
-          onClick={(e) => { e.stopPropagation(); startConnection(transition.id); }}
-          onContextMenu={(e) => { e.preventDefault(); completeConnection(transition.id); }} />
-      ))}
-    </svg>
-  );
-};
-
-export default App;*/
