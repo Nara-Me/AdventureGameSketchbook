@@ -2,7 +2,6 @@
 to do (for now)
 fix arrow bugs - arrow position
                - arrow connection cancelling
-fix place and transition drag - by making the text inside part of the dragable group
 fix everything about the UI lol
 make the properties panel - appear
                           - and work
@@ -11,9 +10,8 @@ fix the firing of tokens - make it non-deterministic
 */
 
 import React, { useState, useRef } from "react";
-import { Stage, Layer, Circle, Rect, Arrow, Text, Image } from "react-konva";
+import { Stage, Layer, Circle, Rect, Arrow, Text, Image, Group } from "react-konva";
 import useImage from "use-image";
-
 import Topbar from "./components/Topbar.js";
 import Toolbar from "./components/Toolbar.js";
 import Properties from "./components/Propertybar.js";
@@ -70,8 +68,8 @@ const App = () => {
   const [places, setPlaces] = useState([]);
   const [transitions, setTransitions] = useState([]);
   const [arcs, setArcs] = useState([]);
+  const [selectedElement, setSelectedElement] = useState(null);
   const [mode, setMode] = useState("edit"); // Modes: "edit", "run"
-
   const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows
   const [contextMenu, setContextMenu] = useState(null); // delete and TBA
   const [connectingFrom, setConnectingFrom] = useState(null);
@@ -115,6 +113,11 @@ const App = () => {
   };
 
   const handleStageClick = (e) => {
+    if (e.target === e.target.getStage()) { //clicked a stage, not an element
+      setConnectingFrom(null);
+      console.log("connection cancelled");
+      setSelectedElement(null); //for property bar
+    }
     setContextMenu(null);
     if (e.evt.button !== 0 || mode !== "edit") return;
     
@@ -136,26 +139,34 @@ const App = () => {
       return;
     }
 
-    if (selectedTool !== "arc") {
-      setConnectingFrom(null);
-      console.log("NO");
-      return;
-    }
-    
-    if (!connectingFrom) { //working spaguetti
-      setConnectingFrom({ id, type });
-    } else if (connectingFrom.id !== id && connectingFrom.type !== type) {
-      console.log("connected");
-      setArcs([...arcs, { from: connectingFrom, to: { id, type } }]);
-      setConnectingFrom(null);
-    } else if (connectingFrom.id === id || connectingFrom.type === type) {
-      setConnectingFrom(null);
-      setConnectingFrom({ id, type });
-      console.log("connection restarted");
-      return;
-    } else {  //just in case
-      console.log("connection cancelled");
-      setConnectingFrom(null);
+    if (mode === "edit") {
+      const element = type === "place"
+        ? places.find((p) => p.id === id)
+        : transitions.find((t) => t.id === id);
+  
+      setSelectedElement({ id, type, asset: element?.asset || null }); // Include asset in selectedElement
+  
+      if (selectedTool !== "arc") {
+        setConnectingFrom(null);
+        return;
+      }
+  
+      if (!connectingFrom) {
+        setConnectingFrom({ id, type });
+        console.log("connecting");
+      } else if (connectingFrom.id !== id && connectingFrom.type !== type) {
+        console.log("connected");
+        setArcs([...arcs, { from: connectingFrom, to: { id, type } }]);
+        setConnectingFrom(null);
+      } else if (connectingFrom.id === id || connectingFrom.type === type) {
+        setConnectingFrom(null);
+        setConnectingFrom({ id, type });
+        console.log("connection restarted");
+        return;
+      } else {
+        console.log("connection cancelled");
+        setConnectingFrom(null);
+      }
     }
   };
 
@@ -197,6 +208,43 @@ const App = () => {
       setArcs(arcs.filter((arc) => arc.from.id !== id && arc.to.id !== id));
     }
     setContextMenu(null);
+  };
+
+  const AssetRenderer = ({ x, y, asset }) => {
+    const [image] = useImage(asset?.image?.src || null);
+  
+    if (!image) return null;
+  
+    const aspectRatio = image.naturalWidth / image.naturalHeight;
+  
+    const desiredWidth = 50;
+    const desiredHeight = desiredWidth / aspectRatio;
+  
+    return (
+      <Image
+        x={x - desiredWidth / 2} // Center the image horizontally
+        y={y + desiredHeight - 10} // Position the image
+        image={image}
+        width={desiredWidth}
+        height={desiredHeight}
+      />
+    );
+  };
+
+  const updateElementAsset = (id, type, { image, sound }) => {
+    if (type === "place") {
+      setPlaces((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, asset: { image, sound } } : p
+        )
+      );
+    } else if (type === "transition") {
+      setTransitions((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, asset: { image, sound } } : t
+        )
+      );
+    }
   };
 
   const fireTransition = (transitionId) => {
@@ -247,37 +295,61 @@ const App = () => {
       <Toolbar selectedTool={selectedTool} setSelectedTool={setSelectedTool} />
         <Stage className="canvas" width={1000} height={height} onClick={handleStageClick} ref={stageRef} onWheel={handleWheel} /*draggable*/>
           <Layer>
-            {places.map((p) => (
-              <>
+          {places.map((p) => (
+            <Group
+              key={p.id}
+              x={p.x}
+              y={p.y}
+              draggable
+              onClick={() => handleElementClick(p.id, "place")}
+              onDragMove={(e) => handleDragMove(e, p.id, "place")}
+              onContextMenu={(e) => handleContextMenu(e, p.id, "place")}
+            >
               <Circle
-                key={p.id}
-                x={p.x} y={p.y}
                 radius={PLACE_RADIUS}
-                fill="white" stroke="black" strokeWidth={BORDER_SIZE}
-                draggable
-                onClick={() => handleElementClick(p.id, "place")}
-                onDragMove={(e) => handleDragMove(e, p.id, "place")}
-                onContextMenu={(e) => handleContextMenu(e, p.id, "place")}
+                fill="white"
+                stroke="black"
+                strokeWidth={BORDER_SIZE}
               />
-              <Text /*key={null}*/ x={p.x - 5} y={p.y - 5} text={p.tokens.toString()} fontSize={14} fill="black" />
-              </>
-            ))}
-            {transitions.map((t) => (
-              <>
+              {p.asset?.image && <AssetRenderer x={0} y={0} asset={p.asset} />}
+              <Text
+                x={-5}
+                y={-5}
+                text={p.tokens.toString()}
+                fontSize={14}
+                fill="black"
+              />
+            </Group>
+          ))}
+
+          {transitions.map((t) => (
+            <Group
+              key={t.id}
+              x={t.x}
+              y={t.y}
+              draggable
+              onClick={() => handleElementClick(t.id, "transition")}
+              onDragMove={(e) => handleDragMove(e, t.id, "transition")}
+              onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
+            >
+              {t.asset?.image && <AssetRenderer x={0} y={0} asset={t.asset} />}
               <Rect
-                key={t.id}
-                x={t.x} y={t.y}
-                width={TRANSITION_WIDTH} height={TRANSITION_HEIGHT}
-                fill="white" stroke="black" strokeWidth={BORDER_SIZE}
+                width={TRANSITION_WIDTH}
+                height={TRANSITION_HEIGHT}
+                fill="white"
+                stroke="black"
+                strokeWidth={BORDER_SIZE}
                 cornerRadius={5}
-                draggable
-                onClick={() => handleElementClick(t.id, "transition")}
-                onDragMove={(e) => handleDragMove(e, t.id, "transition")}
-                onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
               />
-              <Text /*key={null}*/ x={t.x + (TRANSITION_WIDTH/4)} y={t.y + (TRANSITION_HEIGHT/2)-5} text={"Action"} fontSize={14} fill="black" />
-              </>
-            ))}
+              <Text
+                x={TRANSITION_WIDTH / 4}
+                y={TRANSITION_HEIGHT / 2 - 5}
+                text={"Action"}
+                fontSize={14}
+                fill="black"
+              />
+            </Group>
+          ))}
             {arcs.map((arc, index) => (
               <Arrow
                 key={index}
@@ -294,7 +366,8 @@ const App = () => {
             ))}
           </Layer>
         </Stage>
-        <Properties />
+        {/*<Properties />*/}
+        <Properties selectedElement={selectedElement} updateElementAsset={updateElementAsset} />
         </div>
       {contextMenu && (
         <div
