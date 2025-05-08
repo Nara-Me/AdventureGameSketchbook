@@ -245,6 +245,14 @@ const App = () => {
         )
       );
     }
+
+      // Update the selectedElement if it matches the updated element
+  if (selectedElement?.id === id && selectedElement?.type === type) {
+    setSelectedElement((prev) => ({
+      ...prev,
+      asset: { image, sound },
+    }));
+  }
   };
 
   const fireTransition = (transitionId) => {

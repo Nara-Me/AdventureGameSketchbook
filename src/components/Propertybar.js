@@ -17,8 +17,8 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
   //update when the selectedElement changes
   useEffect(() => {
     if (selectedElement) {
-      setSelectedImage(selectedElement.image || null);
-      setSelectedSound(selectedElement.sound || null);
+      setSelectedImage(selectedElement.asset?.image || null);
+      setSelectedSound(selectedElement.asset?.sound || null);
     }
   }, [selectedElement]);
 
