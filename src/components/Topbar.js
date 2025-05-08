@@ -2,10 +2,11 @@ import React from "react";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlay } from '@fortawesome/free-solid-svg-icons'
 import { faPause } from '@fortawesome/free-solid-svg-icons'
-import { faStop } from '@fortawesome/free-solid-svg-icons'
+import { faSitemap } from '@fortawesome/free-solid-svg-icons'
+/*import { faStop } from '@fortawesome/free-solid-svg-icons'
 import { faCirclePlus } from '@fortawesome/free-solid-svg-icons'
 import { faCircleUser } from '@fortawesome/free-solid-svg-icons'
-import App from "../App";
+import App from "../App";*/
 
 
 //https://fontawesome.com/icons/stop?f=classic&s=solid
@@ -27,12 +28,28 @@ import App from "../App";
 };*/
 
 function Topbar({ mode, setMode }) {
+  //const [selectedScene, setSelectedScene] = useState(null);
+
+  //backgrounds that can be selected
+  const Scenes = [
+    { type: "image", src: "./assets/imgs/scenes/forest_scene.jpg" },
+    { type: "image", src: "./assets/imgs/scenes/mineshaftexit_scene.png" },
+    { type: "image", src: "./assets/imgs/scenes/redmoon_scene.png" },
+    { type: "image", src: "./assets/imgs/scenes/waterfalls_scene.jpg" },
+  ];
+
   return (
     <div className="top-bar">
     {/*<button onClick={() => setMode(mode === "edit" ? "run" : "edit")}>
       {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
     </button>*/}
-    <div className="name">Name of the project</div>
+    <div className="name">
+    <FontAwesomeIcon
+        icon={faSitemap}
+        size="xxl"
+        style={{ color: "#444746", marginRight: "8px" }}
+      />
+      Scenes Overview</div>
     <button className="play-button"
       onClick={() => setMode(mode === "edit" ? "run" : "edit")}
     >
@@ -43,6 +60,9 @@ function Topbar({ mode, setMode }) {
       />
       {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
     </button>
+    {
+      
+    }
     </div>
   );
 }

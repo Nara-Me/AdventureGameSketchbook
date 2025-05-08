@@ -146,31 +146,31 @@ const App = () => {
   
       setSelectedElement({ id, type, asset: element?.asset || null }); // Include asset in selectedElement
   
-      if (selectedTool !== "arc") {
+      if (selectedTool !== "arc") { //cancel connection if not arc tool
         setConnectingFrom(null);
         return;
       }
   
-      if (!connectingFrom) {
+      if (!connectingFrom) { //start connecting elements with arcs
         setConnectingFrom({ id, type });
-        console.log("connecting");
+        //console.log("connecting");
       } else if (connectingFrom.id !== id && connectingFrom.type !== type) {
-        console.log("connected");
+        //console.log("connected");
         setArcs([...arcs, { from: connectingFrom, to: { id, type } }]);
         setConnectingFrom(null);
       } else if (connectingFrom.id === id || connectingFrom.type === type) {
         setConnectingFrom(null);
         setConnectingFrom({ id, type });
-        console.log("connection restarted");
+        //console.log("connection restarted");
         return;
       } else {
-        console.log("connection cancelled");
+        //console.log("connection cancelled");
         setConnectingFrom(null);
       }
     }
   };
 
-  const handleDragMove = (e, id, type) => {
+  const handleDragMove = (e, id, type) => { //handle dragging
     const { x, y } = e.target.position();
     if (type === "place") {
       setPlaces((prev) => prev.map((p) => (p.id === id ? { ...p, x, y } : p)));
@@ -189,13 +189,13 @@ const App = () => {
     }
   };
 
-  const handleContextMenu = (e, id, type) => {
+  const handleContextMenu = (e, id, type) => { //right click on an element
     setConnectingFrom(null);
     e.evt.preventDefault();
     setContextMenu({ x: e.evt.clientX, y: e.evt.clientY, id, type });
   };
 
-  const deleteElement = () => {
+  const deleteElement = () => { //delete the selected element
     setConnectingFrom(null);
     if (!contextMenu) return;
     const { id, type } = contextMenu;
@@ -210,7 +210,7 @@ const App = () => {
     setContextMenu(null);
   };
 
-  const AssetRenderer = ({ x, y, asset }) => {
+  const AssetRenderer = ({ x, y, asset }) => { //render the images in the canvas
     const [image] = useImage(asset?.image?.src || null);
   
     if (!image) return null;
@@ -231,44 +231,61 @@ const App = () => {
     );
   };
 
-  const updateElementAsset = (id, type, { image, sound }) => {
+  const updateElementAsset = (id, type, { image, sound, allowPartialFiring }) => {
     if (type === "place") {
       setPlaces((prev) =>
         prev.map((p) =>
           p.id === id ? { ...p, asset: { image, sound } } : p
         )
       );
-    } else if (type === "transition") {
+    } else if (type === "transition") { 
       setTransitions((prev) =>
         prev.map((t) =>
-          t.id === id ? { ...t, asset: { image, sound } } : t
+          t.id === id
+            ? { ...t, asset: { image, sound }, allowPartialFiring: allowPartialFiring ?? t.allowPartialFiring } //question mark is optional chaining
+            : t
         )
       );
     }
-
-      // Update the selectedElement if it matches the updated element
-  if (selectedElement?.id === id && selectedElement?.type === type) {
-    setSelectedElement((prev) => ({
-      ...prev,
-      asset: { image, sound },
-    }));
-  }
+  
+    //update the selectedElement if it matches the updated element
+    if (selectedElement?.id === id && selectedElement?.type === type) {
+      setSelectedElement((prev) => ({
+        ...prev,
+        asset: { image, sound },
+        allowPartialFiring: allowPartialFiring ?? prev.allowPartialFiring,
+      }));
+    }
   };
 
   const fireTransition = (transitionId) => {
+    const transition = transitions.find((t) => t.id === transitionId);
+    if (!transition) return; //check if transition even exists
+  
     const inputPlaces = arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
     const outputPlaces = arcs.filter((arc) => arc.from.id === transitionId).map((arc) => arc.to.id);
-    
-    if (inputPlaces.some((id) => (places.find((p) => p.id === id)?.tokens || 0) < 1)) return;
-    
+  
+    // Check if all input places have at least one token
+    const allInputsHaveTokens = inputPlaces.every((id) => (places.find((p) => p.id === id)?.tokens || 0) >= 1);
+    console.log(allInputsHaveTokens);
+  
+    // If partialFiring is false (default), require all inputs to have tokens
+    if (!transition.allowPartialFiring && !allInputsHaveTokens) return;
+  
+    // If partialFiring is true, check if at least one input has tokens
+    if (transition.allowPartialFiring && inputPlaces.every((id) => (places.find((p) => p.id === id)?.tokens || 0) < 1)) return;
+  
+    // Fire the transition
     setPlaces((prev) =>
-      prev.map((p) =>
-        inputPlaces.includes(p.id)
-          ? { ...p, tokens: p.tokens - 1 }
-          : outputPlaces.includes(p.id)
-          ? { ...p, tokens: p.tokens + 1 }
-          : p
-      )
+      prev.map((p) => {
+        if (inputPlaces.includes(p.id)) {
+          const newTokens = p.tokens - 1;
+          return { ...p, tokens: Math.max(newTokens, 0) }; // Prevent tokens from going negative
+        } else if (outputPlaces.includes(p.id)) {
+          return { ...p, tokens: p.tokens + 1 };
+        }
+        return p;
+      })
     );
   };
 
