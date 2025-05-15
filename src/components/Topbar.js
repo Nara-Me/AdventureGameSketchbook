@@ -27,22 +27,19 @@ import App from "../App";*/
   );
 };*/
 
-function Topbar({ mode, setMode }) {
+function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId }) {
   //const [selectedScene, setSelectedScene] = useState(null);
 
   //backgrounds that can be selected
-  const Scenes = [
+  /*const Scenes = [
     { type: "image", src: "./assets/imgs/scenes/forest_scene.jpg" },
     { type: "image", src: "./assets/imgs/scenes/mineshaftexit_scene.png" },
     { type: "image", src: "./assets/imgs/scenes/redmoon_scene.png" },
     { type: "image", src: "./assets/imgs/scenes/waterfalls_scene.jpg" },
-  ];
+  ];*/
 
   return (
     <div className="top-bar">
-    {/*<button onClick={() => setMode(mode === "edit" ? "run" : "edit")}>
-      {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
-    </button>*/}
     <div className="name">
     <FontAwesomeIcon
         icon={faSitemap}
@@ -60,9 +57,22 @@ function Topbar({ mode, setMode }) {
       />
       {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
     </button>
-    {
-      
-    }
+    <div className="scenes-container" style={{ display: "flex", gap: "10px" }}>
+        {scenes.map((scene) => (
+          <img
+            key={scene.id}
+            src={scene.background}
+            alt={scene.name}
+            width={50}
+            height={50}
+            style={{
+              border: scene.id === currentSceneId ? "2px solid blue" : "2px solid gray",
+              cursor: "pointer",
+            }}
+            onClick={() => setCurrentSceneId(scene.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

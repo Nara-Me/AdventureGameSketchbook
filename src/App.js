@@ -1,12 +1,27 @@
 /*
-to do (for now)
+to do (edit mode)
 fix arrow bugs - arrow position
-               - arrow connection cancelling
-fix everything about the UI lol
-make the properties panel - appear
-                          - and work
+fix everything about the UI - make the canvas scrollable
+                            - make the canvas resizable (fix)
+                            - hide bars option (optionally)
+                            - add a button to add a new scene in the top bar
+                            - add the asset library to the toolbar
+add entry and exit points
+make the properties panel work - fix partial firing checkbox
+                               - add naming of elements
+                               - add sound and image upload
+                               - add sound play types (cyclic, once, etc)
+                               - make entry and exit points association by name
+                               - add x and y coordinates to the elements with images (to be rendered in the "game")
 associate images and sounds to places and actions
-fix the firing of tokens - make it non-deterministic
+add a library of images and sounds
+add a load of different action types (use, take, open, etc)
+
+
+to do (run mode)
+add a character prototype (for now) to move around with arrow keys
+place the places and transitions images in the predefined positions (dictated from the edit mode) as well as background
+fix the firing of tokens - make it run while "playing the game" (when character approaches and interacts with the image associated with the transition)
 */
 
 import React, { useState, useRef } from "react";
@@ -38,7 +53,7 @@ const App = () => {
   const height = window.innerHeight;
   const stageRef = useRef(null);
 
-  const handleWheel = (e) => {
+  const handleWheel = (e) => { //taken from the konva docs
     e.evt.preventDefault();
 
     const stage = stageRef.current;
@@ -67,7 +82,7 @@ const App = () => {
 
   const [places, setPlaces] = useState([]);
   const [transitions, setTransitions] = useState([]);
-  const [arcs, setArcs] = useState([]);
+  //const [arcs, setArcs] = useState([]);
   const [selectedElement, setSelectedElement] = useState(null);
   const [mode, setMode] = useState("edit"); // Modes: "edit", "run"
   const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows
@@ -76,16 +91,55 @@ const App = () => {
   const [nextPlaceId, setNextPlaceId] = useState(1);
   const [nextTransitionId, setNextTransitionId] = useState(1);
 
+    const [scenes, setScenes] = useState([ //array of scenes
+    {
+      id: 1,
+      name: "Forest Scene",
+      background: "./assets/imgs/scenes/forest_scene.jpg",
+      places: [],
+      transitions: [],
+      arcs: [],
+    },
+    {
+      id: 2,
+      name: "Mineshaft Exit",
+      background: "./assets/imgs/scenes/mineshaftexit_scene.png",
+      places: [],
+      transitions: [],
+      arcs: [],
+    },
+    {
+      id: 3,
+      name: "Red Moon",
+      background: "./assets/imgs/scenes/redmoon_scene.png",
+      places: [],
+      transitions: [],
+      arcs: [],
+    },
+    {
+      id: 4,
+      name: "Waterfalls",
+      background: "./assets/imgs/scenes/waterfalls_scene.jpg",
+      places: [],
+      transitions: [],
+      arcs: [],
+    },
+  ]);
+  
+  const [currentSceneId, setCurrentSceneId] = useState(1); // Default to the first scene
+
+  const currentScene = scenes.find((scene) => scene.id === currentSceneId);
+
   const isOverlapping = (x, y) => {
     return (
-      places.some((p) => Math.hypot(p.x - x, p.y - y) < PLACE_RADIUS+10) ||
-      transitions.some((t) => Math.abs(t.x - x) < TRANSITION_WIDTH / 2 && Math.abs(t.y - y) < TRANSITION_HEIGHT / 2)
+      currentScene.places.some((p) => Math.hypot(p.x - x, p.y - y) < PLACE_RADIUS+10) ||
+      currentScene.transitions.some((t) => Math.abs(t.x - x) < TRANSITION_WIDTH / 2 && Math.abs(t.y - y) < TRANSITION_HEIGHT / 2)
     );
   };
 
-  const calculateArrowPoints = (from, to) => {
-    const fromElement = places.find((p) => p.id === from.id) || transitions.find((t) => t.id === from.id);
-    const toElement = places.find((p) => p.id === to.id) || transitions.find((t) => t.id === to.id);
+  const calculateArrowPoints = (from, to) => { //calculate the beginning and end points of the arrow
+    const fromElement = currentScene.places.find((p) => p.id === from.id) || currentScene.transitions.find((t) => t.id === from.id);
+    const toElement = currentScene.places.find((p) => p.id === to.id) || currentScene.transitions.find((t) => t.id === to.id);
     if (!fromElement || !toElement) return [];
 
     let { x: x1, y: y1 } = fromElement;
@@ -93,10 +147,10 @@ const App = () => {
 
     const angle = Math.atan2(y2 - y1, x2 - x1);
 
-    if (from.type === "place") {
+    if (from.type === "place") { //radius for places
       x1 += (GAP_SIZE + PLACE_RADIUS) * Math.cos(angle);
       y1 += (GAP_SIZE + PLACE_RADIUS) * Math.sin(angle);
-    } else if (from.type === "transition") {
+    } else if (from.type === "transition") { //middle point for transitions
       x1 += (TRANSITION_WIDTH / 2) + (GAP_SIZE + TRANSITION_WIDTH / 2) * Math.cos(angle);
       y1 += (TRANSITION_HEIGHT / 2) + (GAP_SIZE + TRANSITION_HEIGHT / 2) * Math.sin(angle);
     }
@@ -112,23 +166,42 @@ const App = () => {
     return [x1, y1, x2, y2];
   };
 
-  const handleStageClick = (e) => {
-    if (e.target === e.target.getStage()) { //clicked a stage, not an element
-      setConnectingFrom(null);
-      console.log("connection cancelled");
-      setSelectedElement(null); //for property bar
+  const handleStageClick = (e) => { //handel clicking on the canvas
+    
+    if (e.target === e.target.getStage()) { //clicked the canvas but not an element
+      setConnectingFrom(null); //cancell connection if there is one
+      //console.log("connection cancelled");
+      setSelectedElement(null); //deselect element
+      setContextMenu(null); //close the delete menu
     }
-    setContextMenu(null);
-    if (e.evt.button !== 0 || mode !== "edit") return;
+    if (e.evt.button !== 0 || mode !== "edit") return; //return if not in edit mode
     
     const { x, y } = e.target.getStage().getPointerPosition();
-    if (isOverlapping(x, y)) return;
+    if (isOverlapping(x, y)) {
+      console.log("overlapping with another");
+      return;}
 
     if (selectedTool === "place") {
-      setPlaces([...places, { id: `p${nextPlaceId}`, x, y, tokens: 0 }]);
+      const updatedScenes = scenes.map((scene) =>
+        scene.id === currentSceneId
+          ? {
+              ...scene,
+              places: [...scene.places, { id: `p${nextPlaceId}`, x, y, tokens: 0 }],
+            }
+          : scene
+      );
+      setScenes(updatedScenes);
       setNextPlaceId(nextPlaceId + 1);
     } else if (selectedTool === "transition") {
-      setTransitions([...transitions, { id: `t${nextTransitionId}`, x, y }]);
+      const updatedScenes = scenes.map((scene) =>
+        scene.id === currentSceneId
+          ? {
+              ...scene,
+              transitions: [...scene.transitions, { id: `t${nextTransitionId}`, x, y }],
+            }
+          : scene
+      );
+      setScenes(updatedScenes);
       setNextTransitionId(nextTransitionId + 1);
     }
   };
@@ -141,11 +214,11 @@ const App = () => {
 
     if (mode === "edit") {
       const element = type === "place"
-        ? places.find((p) => p.id === id)
-        : transitions.find((t) => t.id === id);
-  
-      setSelectedElement({ id, type, asset: element?.asset || null }); // Include asset in selectedElement
-  
+      ? currentScene.places.find((p) => p.id === id)
+      : currentScene.transitions.find((t) => t.id === id);
+
+      setSelectedElement({ id, type, asset: element?.asset || null });
+
       if (selectedTool !== "arc") { //cancel connection if not arc tool
         setConnectingFrom(null);
         return;
@@ -156,7 +229,16 @@ const App = () => {
         //console.log("connecting");
       } else if (connectingFrom.id !== id && connectingFrom.type !== type) {
         //console.log("connected");
-        setArcs([...arcs, { from: connectingFrom, to: { id, type } }]);
+        //setArcs([...arcs, { from: connectingFrom, to: { id, type } }]);
+        const updatedScenes = scenes.map((scene) =>
+          scene.id === currentSceneId
+            ? {
+                ...scene,
+                arcs: [...scene.arcs, { from: connectingFrom, to: { id, type } }],
+              }
+            : scene
+        );
+        setScenes(updatedScenes);
         setConnectingFrom(null);
       } else if (connectingFrom.id === id || connectingFrom.type === type) {
         setConnectingFrom(null);
@@ -170,9 +252,23 @@ const App = () => {
     }
   };
 
-  const handleDragMove = (e, id, type) => { //handle dragging
+  const handleDragMove = (e, id, type) => { //handle dragging of the elements
     const { x, y } = e.target.position();
-    if (type === "place") {
+
+    const updatedScenes = scenes.map((scene) =>
+    scene.id === currentSceneId
+      ? {
+          ...scene,
+          [type === "place" ? "places" : "transitions"]: scene[
+            type === "place" ? "places" : "transitions"
+          ].map((el) => (el.id === id ? { ...el, x, y } : el)),
+        }
+      : scene
+  );
+
+  setScenes(updatedScenes);
+
+    /*if (type === "place") {
       setPlaces((prev) => prev.map((p) => (p.id === id ? { ...p, x, y } : p)));
     } else if (type === "transition") {
       setTransitions((prev) => prev.map((t) => (t.id === id ? { ...t, x, y } : t)));
@@ -186,7 +282,7 @@ const App = () => {
           return t;
         })
       );*/
-    }
+    /*}*/
   };
 
   const handleContextMenu = (e, id, type) => { //right click on an element
@@ -199,14 +295,25 @@ const App = () => {
     setConnectingFrom(null);
     if (!contextMenu) return;
     const { id, type } = contextMenu;
-    if (type === "arc") {
+    /*if (type === "arc") {
       setArcs(arcs.filter((_, index) => index !== id));
     } else {
       //console.log(id);
       setPlaces(places.filter((p) => p.id !== id));
       setTransitions(transitions.filter((t) => t.id !== id));
       setArcs(arcs.filter((arc) => arc.from.id !== id && arc.to.id !== id));
-    }
+    }*/
+      const updatedScenes = scenes.map((scene) =>
+        scene.id === currentSceneId
+          ? {
+              ...scene,
+              arcs: scene.arcs.filter((arc) => arc.from.id !== id && arc.to.id !== id),
+              places: type === "place" ? scene.places.filter((p) => p.id !== id) : scene.places,
+              transitions: type === "transition" ? scene.transitions.filter((t) => t.id !== id) : scene.transitions,
+            }
+          : scene
+      );
+      setScenes(updatedScenes);
     setContextMenu(null);
   };
 
@@ -232,6 +339,26 @@ const App = () => {
   };
 
   const updateElementAsset = (id, type, { image, sound, allowPartialFiring }) => {
+    const updatedScenes = scenes.map((scene) =>
+      scene.id === currentSceneId
+        ? {
+            ...scene,
+            [type === "place" ? "places" : "transitions"]: scene[
+              type === "place" ? "places" : "transitions"
+            ].map((el) =>
+              el.id === id
+                ? {
+                    ...el,
+                    asset: { image, sound },
+                    allowPartialFiring: allowPartialFiring ?? el.allowPartialFiring,
+                  }
+                : el
+            ),
+          }
+        : scene
+    );
+    setScenes(updatedScenes);
+
     if (type === "place") {
       setPlaces((prev) =>
         prev.map((p) =>
@@ -259,24 +386,42 @@ const App = () => {
   };
 
   const fireTransition = (transitionId) => {
-    const transition = transitions.find((t) => t.id === transitionId);
+    const transition = currentScene.transitions.find((t) => t.id === transitionId);
     if (!transition) return; //check if transition even exists
   
-    const inputPlaces = arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
-    const outputPlaces = arcs.filter((arc) => arc.from.id === transitionId).map((arc) => arc.to.id);
+    const inputPlaces = currentScene.arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
+    const outputPlaces = currentScene.arcs.filter((arc) => arc.from.id === transitionId).map((arc) => arc.to.id);
   
     // Check if all input places have at least one token
-    const allInputsHaveTokens = inputPlaces.every((id) => (places.find((p) => p.id === id)?.tokens || 0) >= 1);
+    const allInputsHaveTokens = inputPlaces.every((id) => (currentScene.places.find((p) => p.id === id)?.tokens || 0) >= 1);
     console.log(allInputsHaveTokens);
   
     // If partialFiring is false (default), require all inputs to have tokens
     if (!transition.allowPartialFiring && !allInputsHaveTokens) return;
   
     // If partialFiring is true, check if at least one input has tokens
-    if (transition.allowPartialFiring && inputPlaces.every((id) => (places.find((p) => p.id === id)?.tokens || 0) < 1)) return;
+    if (transition.allowPartialFiring && inputPlaces.every((id) => (currentScene.places.find((p) => p.id === id)?.tokens || 0) < 1)) return;
   
     // Fire the transition
-    setPlaces((prev) =>
+    const updatedScenes = scenes.map((scene) =>
+    scene.id === currentSceneId
+      ? {
+          ...scene,
+          places: scene.places.map((p) => {
+            if (inputPlaces.includes(p.id)) {
+              const newTokens = p.tokens - 1;
+              return { ...p, tokens: Math.max(newTokens, 0) }; // Prevent tokens from going negative
+            } else if (outputPlaces.includes(p.id)) {
+              return { ...p, tokens: p.tokens + 1 };
+            }
+            return p;
+          }),
+        }
+      : scene
+  );
+
+  setScenes(updatedScenes);
+    /*setPlaces((prev) =>
       prev.map((p) => {
         if (inputPlaces.includes(p.id)) {
           const newTokens = p.tokens - 1;
@@ -286,7 +431,7 @@ const App = () => {
         }
         return p;
       })
-    );
+    );*/
   };
 
   /*const fireTransition = (transitionId) => {
@@ -315,12 +460,19 @@ const App = () => {
 
   return (
     <div>
-      <Topbar mode={mode} setMode={setMode} />
+      <Topbar 
+      mode={mode}
+      setMode={setMode}
+      scenes={scenes}
+      currentSceneId={currentSceneId}
+      setCurrentSceneId={setCurrentSceneId}
+      />
       <div className="container">
       <Toolbar selectedTool={selectedTool} setSelectedTool={setSelectedTool} />
         <Stage className="canvas" width={1000} height={height} onClick={handleStageClick} ref={stageRef} onWheel={handleWheel} /*draggable*/>
           <Layer>
-          {places.map((p) => (
+          {/* Render Places */}
+          {currentScene.places.map((p) => (
             <Group
               key={p.id}
               x={p.x}
@@ -347,7 +499,8 @@ const App = () => {
             </Group>
           ))}
 
-          {transitions.map((t) => (
+          {/* Render Transitions */}
+          {currentScene.transitions.map((t) => (
             <Group
               key={t.id}
               x={t.x}
@@ -357,7 +510,7 @@ const App = () => {
               onDragMove={(e) => handleDragMove(e, t.id, "transition")}
               onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
             >
-              {t.asset?.image && <AssetRenderer x={0} y={0} asset={t.asset} />}
+              {t.asset?.image && <AssetRenderer x={TRANSITION_WIDTH/2} y={-TRANSITION_HEIGHT*2.5} asset={t.asset} />}
               <Rect
                 width={TRANSITION_WIDTH}
                 height={TRANSITION_HEIGHT}
@@ -374,8 +527,9 @@ const App = () => {
                 fill="black"
               />
             </Group>
-          ))}
-            {arcs.map((arc, index) => (
+          ))}  
+          {/* Render Arcs */}
+          {currentScene.arcs.map((arc, index) => (
               <Arrow
                 key={index}
                 points={calculateArrowPoints(arc.from, arc.to)}
@@ -396,7 +550,14 @@ const App = () => {
         </div>
       {contextMenu && (
         <div
-          style={{ position: "absolute", top: contextMenu.y, left: contextMenu.x, background: "white", padding: "5px", border: "1px solid black" }}
+          style={{
+          position: "absolute",
+          top: contextMenu.y,
+          left: contextMenu.x,
+          background: "white",
+          padding: "5px",
+          border: "1px solid black",
+          zIndex: 1000}}
         >
           <button onClick={deleteElement}>Delete</button>
         </div>
