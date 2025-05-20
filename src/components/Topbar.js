@@ -63,8 +63,8 @@ function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId }) {
             key={scene.id}
             src={scene.background}
             alt={scene.name}
-            width={50}
-            height={50}
+            width={scene.background.width}
+            height={80}
             style={{
               border: scene.id === currentSceneId ? "2px solid blue" : "2px solid gray",
               cursor: "pointer",

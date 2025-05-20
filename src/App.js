@@ -43,9 +43,9 @@ import { PlaceElement, TransitionElement, ArcElement } from ".components/element
 };*/
 
 const App = () => {
-  const GAP_SIZE = 7;
+  const GAP_SIZE = 7; //7
   const BORDER_SIZE = 2;
-  const PLACE_RADIUS = 20;
+  const PLACE_RADIUS = 20; //20
   const TRANSITION_WIDTH = 100;
   const TRANSITION_HEIGHT = 40;
 
@@ -68,7 +68,7 @@ const App = () => {
     // how to scale? Zoom in? Or zoom out?
     let direction = e.evt.deltaY > 0 ? 1 : -1;
 
-    const scaleBy = 1.05;
+    const scaleBy = 1.03;
     const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
 
     stage.scale({ x: newScale, y: newScale });
@@ -145,22 +145,21 @@ const App = () => {
     let { x: x1, y: y1 } = fromElement;
     let { x: x2, y: y2 } = toElement;
 
-    const angle = Math.atan2(y2 - y1, x2 - x1);
-
+    const angle = Math.atan2((y2 - y1), (x2 - x1));
     if (from.type === "place") { //radius for places
       x1 += (GAP_SIZE + PLACE_RADIUS) * Math.cos(angle);
       y1 += (GAP_SIZE + PLACE_RADIUS) * Math.sin(angle);
     } else if (from.type === "transition") { //middle point for transitions
-      x1 += (TRANSITION_WIDTH / 2) + (GAP_SIZE + TRANSITION_WIDTH / 2) * Math.cos(angle);
-      y1 += (TRANSITION_HEIGHT / 2) + (GAP_SIZE + TRANSITION_HEIGHT / 2) * Math.sin(angle);
+      x1 += (GAP_SIZE + TRANSITION_WIDTH/2) * Math.cos(angle);
+      y1 += (GAP_SIZE + TRANSITION_HEIGHT/2) * Math.sin(angle);
     }
 
     if (to.type === "place") {
       x2 -= (GAP_SIZE + PLACE_RADIUS) * Math.cos(angle);
       y2 -= (GAP_SIZE + PLACE_RADIUS) * Math.sin(angle);
     } else if (to.type === "transition") {
-      x2 -= (-TRANSITION_WIDTH / 2) + (GAP_SIZE + TRANSITION_WIDTH / 2) * Math.cos(angle);
-      y2 -= (-TRANSITION_HEIGHT / 2) + (GAP_SIZE + TRANSITION_HEIGHT / 2) * Math.sin(angle);
+      x2 -= (GAP_SIZE + TRANSITION_WIDTH/2) * Math.cos(angle);
+      y2 -= (GAP_SIZE + TRANSITION_HEIGHT/2) * Math.sin(angle);
     }
 
     return [x1, y1, x2, y2];
@@ -294,26 +293,38 @@ const App = () => {
   const deleteElement = () => { //delete the selected element
     setConnectingFrom(null);
     if (!contextMenu) return;
-    const { id, type } = contextMenu;
-    /*if (type === "arc") {
-      setArcs(arcs.filter((_, index) => index !== id));
-    } else {
-      //console.log(id);
-      setPlaces(places.filter((p) => p.id !== id));
-      setTransitions(transitions.filter((t) => t.id !== id));
-      setArcs(arcs.filter((arc) => arc.from.id !== id && arc.to.id !== id));
-    }*/
-      const updatedScenes = scenes.map((scene) =>
-        scene.id === currentSceneId
-          ? {
-              ...scene,
-              arcs: scene.arcs.filter((arc) => arc.from.id !== id && arc.to.id !== id),
-              places: type === "place" ? scene.places.filter((p) => p.id !== id) : scene.places,
-              transitions: type === "transition" ? scene.transitions.filter((t) => t.id !== id) : scene.transitions,
-            }
-          : scene
-      );
-      setScenes(updatedScenes);
+    const { id, type } = contextMenu; //may be deprecated
+
+    const updatedScenes = scenes.map((scene) => { //simplified version
+      if (scene.id === currentSceneId) {
+        const updatedScene = { ...scene };
+        if (type === "arc") { // only delete the arc connecting two elements
+          updatedScene.arcs = updatedScene.arcs.filter((_, index) => index !== id)
+          return updatedScene;
+        }
+        updatedScene.arcs = updatedScene.arcs.filter((arc) => arc.from.id !== id && arc.to.id !== id); // delete the arc connected to the deleted element
+        if (type === "place") {
+          updatedScene.places = updatedScene.places.filter((p) => p.id !== id);
+        }
+        if (type === "transition") {
+          updatedScene.transitions = updatedScene.transitions.filter((t) => t.id !== id);
+        }
+        return updatedScene;
+      }
+      return scene;
+    });
+
+    /*const updatedScenes = scenes.map((scene) =>
+      scene.id === currentSceneId
+        ? {
+            ...scene,
+            arcs: scene.arcs.filter((arc) => arc.from.id !== id && arc.to.id !== id),
+            places: type === "place" ? scene.places.filter((p) => p.id !== id) : scene.places,
+            transitions: type === "transition" ? scene.transitions.filter((t) => t.id !== id) : scene.transitions,
+          }
+        : scene
+    );*/
+    setScenes(updatedScenes);
     setContextMenu(null);
   };
 
@@ -510,8 +521,10 @@ const App = () => {
               onDragMove={(e) => handleDragMove(e, t.id, "transition")}
               onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
             >
-              {t.asset?.image && <AssetRenderer x={TRANSITION_WIDTH/2} y={-TRANSITION_HEIGHT*2.5} asset={t.asset} />}
+              {t.asset?.image && <AssetRenderer x={0} y={-TRANSITION_HEIGHT*2.9} asset={t.asset} />}
               <Rect
+                x={-TRANSITION_WIDTH/2}
+                y={-TRANSITION_HEIGHT/2}
                 width={TRANSITION_WIDTH}
                 height={TRANSITION_HEIGHT}
                 fill="white"
@@ -520,8 +533,8 @@ const App = () => {
                 cornerRadius={5}
               />
               <Text
-                x={TRANSITION_WIDTH / 4}
-                y={TRANSITION_HEIGHT / 2 - 5}
+                x={-TRANSITION_WIDTH / 4}
+                y={-TRANSITION_HEIGHT / 2 + 12}
                 text={"Action"}
                 fontSize={14}
                 fill="black"
