@@ -4,72 +4,83 @@
 import React, { useState, useEffect } from "react";
 
 const Properties = ({ selectedElement, updateElementAsset }) => {
-  // State variables to store the selected image, sound
+  //variables to store the selected image, sound
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedSound, setSelectedSound] = useState(null);
-  const [allowPartialFiring, setAllowPartialFiring] = useState(false);
+  //const [allowPartialFiring, setAllowPartialFiring] = useState(false);
   const [isImageSelectorOpen, setIsImageSelectorOpen] = useState(false);
 
   //images and sounds that can be selected
   const availableImages = [
     { type: "image", src: "./assets/imgs/objects/door.png" },
     { type: "image", src: "./assets/imgs/objects/RPG_key.png" },
+    { type: "image", src: "./assets/imgs/objects/RPG_NPC.png" },
+    { type: "image", src: "./assets/imgs/objects/RPG_bag.png" },
   ];
 
   const availableSounds = [
     { type: "audio", src: "./assets/audio/yippee-tbh-creature-jazz.mp3" },
   ];
 
-  // Update the component's state when the selectedElement prop changes
+  //update the component when the selectedElement asset changes
   useEffect(() => {
     if (selectedElement) {
       setSelectedImage(selectedElement.asset?.image || null);
       setSelectedSound(selectedElement.asset?.sound || null);
-      setAllowPartialFiring(selectedElement.allowPartialFiring || false);
+      //console.log(!!selectedElement.allowPartialFiring);
+      //setAllowPartialFiring(selectedElement.allowPartialFiring || false);
     }
   }, [selectedElement]);
 
-  // If no element is selected, hide the properties panel
+  //if no element is selected, hide the properties bar
   if (!selectedElement) {
     return null;
   }
 
   const handleImageSelect = (image) => {
-    setSelectedImage(image); // Set the selected image in the state
+    setSelectedImage(image); //set the selected image in the state
     if (selectedElement) {
-      // Update the asset for the selected element (keep sound as it was)
-      updateElementAsset(selectedElement.id, selectedElement.type, { image, sound: selectedSound });
+      //update the asset (keep sound as it was)
+      updateElementAsset(selectedElement.id, selectedElement.type, { image, sound: selectedSound }, selectedElement.allowPartialFiring);
     }
-    setIsImageSelectorOpen(false); // Close the image selector
+    setIsImageSelectorOpen(false); //close the image selector
   };
 
   const handleSoundChange = (e) => {
     const sound = availableSounds.find((s) => s.src === e.target.value);
     setSelectedSound(sound);
     if (selectedElement) {
-      // Update the element asset with the selected (keep image as it was)
-      updateElementAsset(selectedElement.id, selectedElement.type, { image: selectedImage, sound });
+      //update the asset (keep image as it was)
+      updateElementAsset(selectedElement.id, selectedElement.type, { image: selectedImage, sound }, selectedElement.allowPartialFiring);
     }
   };
 
-  // Handle clearing the selected image
+  //clears the image info of the element
   const handleClearImage = () => {
-    setSelectedImage(null); // Set the selected image to null
+    setSelectedImage(null);
     if (selectedElement) {
-      // remove image asset
-      updateElementAsset(selectedElement.id, selectedElement.type, { image: null, sound: selectedSound });
+      //remove image asset
+      updateElementAsset(selectedElement.id, selectedElement.type, { image: null, sound: selectedSound }, selectedElement.allowPartialFiring);
     }
   };
 
-  // Toggle the Allow Partial Firing checkbox
+  //toggle the Allow Partial Firing checkbox (visually resets the bar for some reason)
   const handleAllowPartialFiringChange = (e) => {
-    const isChecked  = e.target.checked; //bool value of checkbox
-    if (allowPartialFiring !== isChecked) {
-    setAllowPartialFiring(isChecked); //update checkbox
+    const isChecked = e.target.checked;
+    //console.log(selectedElement.allowPartialFiring);
+    //setAllowPartialFiring(isChecked);
+    //console.log(isChecked);
     if (selectedElement) {
-      // Update the elements partialFiring property
-      updateElementAsset(selectedElement.id, selectedElement.type, { allowPartialFiring: isChecked });
-    }}
+      updateElementAsset(
+        selectedElement.id,
+        selectedElement.type,
+        {
+          ...selectedElement.asset, //keep all other properties unchanged!
+          
+        },
+        isChecked,
+      );
+    }
   };
 
   return (
@@ -111,13 +122,63 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
                 width={50}z
                 height={50}
                 style={{ cursor: "pointer", border: selectedImage?.src === image.src ? "2px solid blue" : "1px solid gray" }}
-                onClick={() => handleImageSelect(image)} // When an image is clicked, select it
+                onClick={() => handleImageSelect(image)} //when an image is clicked, select it
               />
             ))}
           </div>
           <button onClick={() => setIsImageSelectorOpen(false)} style={{ marginTop: "10px" }}>
             Close
           </button>
+        </div>
+      )}
+
+      {/* Image POsition */}
+      {/*selectedElement.type === "transition" &&*/ (
+        <div>
+          <label>
+            X:
+            <input
+              type="number"
+              value={selectedElement.asset?.assetPosition?.x ?? 0}
+              onChange={e =>
+                updateElementAsset(
+                  selectedElement.id,
+                  selectedElement.type,
+                  {
+                    ...selectedElement.asset,
+                    assetPosition: {
+                      x: Number(e.target.value),
+                      y: selectedElement.asset?.assetPosition?.y ?? 0
+                    }
+                  },
+                  selectedElement.allowPartialFiring,
+                )
+              }
+              style={{ width: 60, marginLeft: 5 }}
+            />
+          </label>
+          <label style={{ marginLeft: 10 }}>
+            Y:
+            <input
+              type="number"
+              value={selectedElement.asset?.assetPosition?.y ?? 0}
+              onChange={e =>
+                updateElementAsset(
+                  selectedElement.id,
+                  selectedElement.type,
+                  {
+                    ...selectedElement.asset,
+                    assetPosition: {
+                      x: selectedElement.asset?.assetPosition?.x ?? 0,
+                      y: Number(e.target.value)
+                    }
+                  },
+                  selectedElement.allowPartialFiring,
+                )
+              }
+              style={{ width: 60, marginLeft: 5 }}
+            />
+          </label>
         </div>
       )}
 
@@ -140,8 +201,8 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
           Only need one input to activate:
           <input
             type="checkbox"
-            checked={allowPartialFiring}
-            onChange={handleAllowPartialFiringChange} // Handle checkbox change
+            checked={!!selectedElement.allowPartialFiring}
+            onChange={handleAllowPartialFiringChange}
           />
         </label>
       )}

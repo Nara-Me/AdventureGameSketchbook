@@ -1,39 +1,11 @@
-/*
-to do (edit mode)
-fix arrow bugs - arrow position
-fix everything about the UI - make the canvas scrollable
-                            - make the canvas resizable (fix)
-                            - hide bars option (optionally)
-                            - add a button to add a new scene in the top bar
-                            - add the asset library to the toolbar
-add entry and exit points
-make the properties panel work - fix partial firing checkbox
-                               - add naming of elements
-                               - add sound and image upload
-                               - add sound play types (cyclic, once, etc)
-                               - make entry and exit points association by name
-                               - add x and y coordinates to the elements with images (to be rendered in the "game")
-associate images and sounds to places and actions
-add a library of images and sounds
-add a load of different action types (use, take, open, etc)
-
-
-to do (run mode)
-add a character prototype (for now) to move around with arrow keys
-place the places and transitions images in the predefined positions (dictated from the edit mode) as well as background
-fix the firing of tokens - make it run while "playing the game" (when character approaches and interacts with the image associated with the transition)
-*/
-
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Stage, Layer, Circle, Rect, Arrow, Text, Image, Group } from "react-konva";
 import useImage from "use-image";
 import Topbar from "./components/Topbar.js";
 import Toolbar from "./components/Toolbar.js";
 import Properties from "./components/Propertybar.js";
-/*import { usePlaceState, useTransitionState, useArcState, useModeState } from "./components/hooks.js";
-import { isOverlapping, calculateArrowPoints } from "./components/utils.js";
-import { handleWheel, handleStageClick } from "./components/actions.js";
-import { PlaceElement, TransitionElement, ArcElement } from ".components/elementsjs";*/
+
+import LoadImage from "./components/LoadImage";
 
 // Predefined assets
 /*const assets = {
@@ -48,6 +20,7 @@ const App = () => {
   const PLACE_RADIUS = 20; //20
   const TRANSITION_WIDTH = 100;
   const TRANSITION_HEIGHT = 40;
+  const debug = false; // true to show edit mode when "running"
 
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -80,18 +53,20 @@ const App = () => {
     stage.position(newPos);
   };
 
-  const [places, setPlaces] = useState([]);
-  const [transitions, setTransitions] = useState([]);
+  //const [places, setPlaces] = useState([]);
+  //const [transitions, setTransitions] = useState([]);
   //const [arcs, setArcs] = useState([]);
   const [selectedElement, setSelectedElement] = useState(null);
-  const [mode, setMode] = useState("edit"); // Modes: "edit", "run"
+  const [mode, setMode] = useState("edit"); // Modes: "edit", "run", and maybe "overview"
   const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows
   const [contextMenu, setContextMenu] = useState(null); // delete and TBA
   const [connectingFrom, setConnectingFrom] = useState(null);
   const [nextPlaceId, setNextPlaceId] = useState(1);
   const [nextTransitionId, setNextTransitionId] = useState(1);
 
-    const [scenes, setScenes] = useState([ //array of scenes
+  const [character, setCharacter] = useState({ x: 100, y: 600, size: 80 });
+
+  const [scenes, setScenes] = useState([ //array of preloaded scenes for testing
     {
       id: 1,
       name: "Forest Scene",
@@ -126,11 +101,21 @@ const App = () => {
     },
   ]);
   
-  const [currentSceneId, setCurrentSceneId] = useState(1); // Default to the first scene
+  const [currentSceneId, setCurrentSceneId] = useState(1); //default to the first scene
 
   const currentScene = scenes.find((scene) => scene.id === currentSceneId);
 
-  const isOverlapping = (x, y) => {
+  useEffect(() => { //flip modes with esc key
+    const handleEsc = (e) => {
+      if (e.key === "Escape") {
+        setMode((prev) => (prev === "edit" ? "run" : "edit"));
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
+
+  const isOverlapping = (x, y) => { //when placing an element, check if there is one already
     return (
       currentScene.places.some((p) => Math.hypot(p.x - x, p.y - y) < PLACE_RADIUS+10) ||
       currentScene.transitions.some((t) => Math.abs(t.x - x) < TRANSITION_WIDTH / 2 && Math.abs(t.y - y) < TRANSITION_HEIGHT / 2)
@@ -177,7 +162,7 @@ const App = () => {
     
     const { x, y } = e.target.getStage().getPointerPosition();
     if (isOverlapping(x, y)) {
-      console.log("overlapping with another");
+      //console.log("overlapping with another");
       return;}
 
     if (selectedTool === "place") {
@@ -212,11 +197,31 @@ const App = () => {
     }
 
     if (mode === "edit") {
-      const element = type === "place"
+      /*const element = type === "place"
       ? currentScene.places.find((p) => p.id === id)
       : currentScene.transitions.find((t) => t.id === id);
 
-      setSelectedElement({ id, type, asset: element?.asset || null });
+      setSelectedElement({ id, type, asset: element?.asset || null });*/
+
+      let element;
+      if (type === "place") {
+        element = currentScene.places.find((p) => p.id === id);
+        setSelectedElement({
+          id,
+          type,
+          asset: element?.asset || null,
+          //add more place properties later
+        });
+      } else {
+        element = currentScene.transitions.find((t) => t.id === id);
+        setSelectedElement({
+          id,
+          type,
+          asset: element?.asset || null,
+          allowPartialFiring: element?.allowPartialFiring ?? false,
+          //add more transition properties later
+        });
+      }
 
       if (selectedTool !== "arc") { //cancel connection if not arc tool
         setConnectingFrom(null);
@@ -349,38 +354,51 @@ const App = () => {
     );
   };
 
-  const updateElementAsset = (id, type, { image, sound, allowPartialFiring }) => {
-    const updatedScenes = scenes.map((scene) =>
-      scene.id === currentSceneId
-        ? {
-            ...scene,
-            [type === "place" ? "places" : "transitions"]: scene[
-              type === "place" ? "places" : "transitions"
-            ].map((el) =>
-              el.id === id
-                ? {
-                    ...el,
-                    asset: { image, sound },
-                    allowPartialFiring: allowPartialFiring ?? el.allowPartialFiring,
-                  }
-                : el
-            ),
+/*   const updateElementAsset = (id, type, { image, sound, allowPartialFiring, position }) => {
+    // Loop through each scene
+    const updatedScenes = scenes.map((scene) => {
+      if (scene.id === currentSceneId) {
+        //check which type to update
+        const typeUpdate = type === "place" ? "places" : "transitions";
+      
+        scene[typeUpdate] = scene[typeUpdate].map((element) => {
+          if (element.id === id) {
+            const updatedElement = {
+            //return {
+              ...element, //keep the other properties
+              asset: { image, sound, position }, //update asset
+              allowPartialFiring: allowPartialFiring ?? element.allowPartialFiring, //not working??? visual reset but "works"
+            };
+            /*if (type === "transition" && position) { //
+              Object.assign(updatedElement, position);
+            }*/
+            /*return updatedElement;
+
+          } else {
+            //if not the selected element, do nothing
+            return element;
           }
-        : scene
-    );
+        });
+      
+        return scene;
+      }
+    
+      return scene; //if not the current scene, do nothing
+    });
+  
     setScenes(updatedScenes);
 
     if (type === "place") {
       setPlaces((prev) =>
         prev.map((p) =>
-          p.id === id ? { ...p, asset: { image, sound } } : p
+          p.id === id ? { ...p, asset: { image, sound, position } } : p
         )
       );
     } else if (type === "transition") { 
       setTransitions((prev) =>
         prev.map((t) =>
           t.id === id
-            ? { ...t, asset: { image, sound }, allowPartialFiring: allowPartialFiring ?? t.allowPartialFiring } //question mark is optional chaining
+            ? { ...t, asset: { image, sound, position }, allowPartialFiring: allowPartialFiring ?? t.allowPartialFiring } //question mark is optional chaining (so no nulls)
             : t
         )
       );
@@ -390,8 +408,44 @@ const App = () => {
     if (selectedElement?.id === id && selectedElement?.type === type) {
       setSelectedElement((prev) => ({
         ...prev,
-        asset: { image, sound },
+        asset: { image, sound , position},
         allowPartialFiring: allowPartialFiring ?? prev.allowPartialFiring,
+      }));
+    }
+  }; */
+
+  const updateElementAsset = (id, type, asset, allowPartialFiring) => {
+    //updates the scene array
+    const updatedScenes = scenes.map((scene) => { //loops through all the scenes and only updates the current one
+      if (scene.id === currentSceneId) {
+        const typeUpdate = type === "place" ? "places" : "transitions"; //updates either places or transitions
+        return {
+          ...scene,
+          [typeUpdate]: scene[typeUpdate].map((element) => //loops through all places or transitions in the scene
+            element.id === id
+              ? {
+                  ...element,
+                  asset: { ...asset },
+                  ...(typeof allowPartialFiring !== "undefined"
+                    ? { allowPartialFiring }
+                    : {}),
+                }
+              : element
+          ),
+        };
+      }
+      return scene;
+    });
+    setScenes(updatedScenes);
+
+    //updates the selected elements state
+    if (selectedElement?.id === id && selectedElement?.type === type) {
+      setSelectedElement((prev) => ({
+        ...prev,
+        asset: { ...asset },
+        ...(typeof allowPartialFiring !== "undefined"
+          ? { allowPartialFiring }
+          : {}),
       }));
     }
   };
@@ -405,7 +459,7 @@ const App = () => {
   
     // Check if all input places have at least one token
     const allInputsHaveTokens = inputPlaces.every((id) => (currentScene.places.find((p) => p.id === id)?.tokens || 0) >= 1);
-    console.log(allInputsHaveTokens);
+    //console.log(allInputsHaveTokens);
   
     // If partialFiring is false (default), require all inputs to have tokens
     if (!transition.allowPartialFiring && !allInputsHaveTokens) return;
@@ -445,29 +499,34 @@ const App = () => {
     );*/
   };
 
-  /*const fireTransition = (transitionId) => {
-    const transition = transitions.find((t) => t.id === transitionId);
-    if (!transition) return;
+  useEffect(() => { // IMPROVE IMMENSELLY
+    if (mode !== "run") return;
+    const handleKeyDown = (e) => {
+      setCharacter(prev => {
+        let { x, y, size } = prev;
+        const step = 10;
+        if (e.key === "ArrowUp") y -= step;
+        if (e.key === "ArrowDown") y += step;
+        if (e.key === "ArrowLeft") x -= step;
+        if (e.key === "ArrowRight") x += step;
+        return { ...prev, x, y };
+      });
+      if (e.key === " ") { // Spacebar
+        //check proximity to transitions
+        currentScene.transitions.forEach((t) => {
+          const dx = character.x - t.asset.assetPosition?.x;
+          const dy = character.y - t.asset.assetPosition?.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 40) {
+            fireTransition(t.id);
+          }
+        });
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mode, character, currentScene]);
 
-    const inputPlaces = arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
-    const outputPlaces = arcs.filter((arc) => arc.from.id === transitionId).map((arc) => arc.to.id);
-
-    if (inputPlaces.some((id) => (places.find((p) => p.id === id)?.tokens || 0) < 1)) return;
-
-    setPlaces((prev) =>
-      prev.map((p) =>
-        inputPlaces.includes(p.id)
-          ? { ...p, tokens: p.tokens - 1 }
-          : outputPlaces.includes(p.id)
-          ? { ...p, tokens: p.tokens + 1 }
-          : p
-      )
-    );
-
-    if (transition.action === "playSound") {
-      assets.sound1.play();
-    }
-  };*/
+  const backgroundImage = useImage(currentScene.background)[0]; //preload the background image so useImage works
 
   return (
     <div>
@@ -480,6 +539,7 @@ const App = () => {
       />
       <div className="container">
       <Toolbar selectedTool={selectedTool} setSelectedTool={setSelectedTool} />
+      {console.log(mode)}
         <Stage className="canvas" width={1000} height={height} onClick={handleStageClick} ref={stageRef} onWheel={handleWheel} /*draggable*/>
           <Layer>
           {/* Render Places */}
@@ -558,6 +618,53 @@ const App = () => {
             ))}
           </Layer>
         </Stage>
+        {
+        mode === "run" && !debug && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              zIndex: 9999,
+              background: "black",
+            }}
+          >
+            <Stage width={window.innerWidth} height={window.innerHeight}>
+              <Layer>
+                {/* Background */}
+                <Image
+                  x={0}
+                  y={0}
+                  width={window.innerWidth}
+                  height={window.innerHeight}
+                  image={backgroundImage}
+                />
+                {/* Actions (Transitions) */}
+                {currentScene.transitions.map((t) =>
+                  t.asset?.image ? (
+                    <LoadImage
+                      key={t.id}
+                      x={t.asset.assetPosition?.x ?? width/4}
+                      y={t.asset.assetPosition?.y ?? height/4}
+                      src={t.asset.image.src}
+                      width={100}
+                      height={200}
+                    />
+                  ) : null
+                )}
+                {/* Character */}
+                <Circle
+                  x={character.x}
+                  y={character.y}
+                  radius={character.size / 2}
+                  fill="red"
+                />
+              </Layer>
+            </Stage>
+          </div>
+        )}
         {/*<Properties />*/}
         <Properties selectedElement={selectedElement} updateElementAsset={updateElementAsset} />
         </div>
@@ -577,323 +684,6 @@ const App = () => {
       )}
     </div>
   );
-
-//return (
-//  <div>
-//    <Topbar />
-//    <button onClick={() => setMode(mode === "edit" ? "run" : "edit")}>
-//      {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
-//    </button>
-//    <Stage width={800} height={600}>
-//      <Layer>
-//        {places.map((p) => {
-//          const [image] = useImage(assets[p.asset]);
-//          return (
-//            <>
-//              <Circle key={p.id} x={p.x} y={p.y} radius={20} fill="white" stroke="black" strokeWidth={2} />
-//              {mode === "run" && image && <Image x={p.x - 15} y={p.y - 15} image={image} width={30} height={30} />}
-//              <Text x={p.x - 5} y={p.y - 5} text={p.tokens.toString()} fontSize={14} fill="black" />
-//            </>
-//          );
-//        })}
-//        {transitions.map((t) => (
-//          <Rect
-//            key={t.id}
-//            x={t.x}
-//            y={t.y}
-//            width={40}
-//            height={40}
-//            fill="white"
-//            stroke="black"
-//            strokeWidth={2}
-//            onClick={() => mode === "run" && fireTransition(t.id)}
-//          />
-//        ))}
-//        {arcs.map((arc, index) => (
-//          <Arrow key={index} points={[100, 100, 300, 100]} stroke="black" fill="white" strokeWidth={2} />
-//        ))}
-//      </Layer>
-//    </Stage>
-//  </div>
-//);
 };
 
 export default App;
-
-
-//import React, { useState } from "react";
-//import usePetriNet from "./components/PetriNet.js";
-//import Topbar from "./components/Topbar.js";
-//import Toolbar from "./components/Toolbar.js";
-//import Properties from "./components/Propertybar.js";
-//
-//const App = () => {
-//  const BORDER_SIZE = 2;
-//  const PLACE_RADIUS = 20;
-//  const TRANSITION_WIDTH = 80;
-//  const TRANSITION_HEIGHT = 40;
-//
-//  const { places, transitions, arcs, addPlace, addTransition, startConnection, completeConnection, mode, connectingFrom } = usePetriNet();
-//  const [mousePos, setMousePos] = useState(null);
-//
-//  const CanvasClick = (e) => {
-//    const { offsetX, offsetY } = e.nativeEvent;
-//
-//    if (mode === "place") addPlace(offsetX, offsetY);
-//    if (mode === "transition") addTransition(offsetX, offsetY);
-//  };
-//
-//  /*const handleMouseMove = (e) => {
-//    if (connectingFrom) {
-//      setMousePos({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
-//    }
-//  }*/
-//
-//  const [draggingArc, setDraggingArc] = useState(null);
-//
-//  const handleMouseDown = (id) => {
-//    if (mode === "arc") {
-//      setDraggingArc(id); //start dragging from this element
-//    }
-//  };
-//
-//  const handleMouseUp = (id) => {
-//    if (mode === "arc" && draggingArc) {
-//      completeConnection(id); //complete connection if released on another element
-//    }
-//    setDraggingArc(null); //stop dragging in any case
-//  };
-//
-//  const handleMouseMove = (e) => {
-//    if (draggingArc || connectingFrom) {
-//      setMousePos({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
-//    }else {
-//      setMousePos(null); // Hide the temp arc when no connection active
-//  }
-//  };
-//
-//  /*const handleMouseMove = (e) => {
-//    if (connectingFrom) {
-//        setMousePos({ x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY });
-//    } else {
-//        setMousePos(null); // Hide the temp arc when no connection active
-//    }};    
-//  };*/
-//
-//  const lineIntersectionOnRect = (width, height, xB, yB, xA, yA) => {
-//    const w = width / 2 ;
-//    const h = height / 2;
-//    const dx = xA - xB;
-//    const dy = yA - yB;
-//
-//    //if A=B return B itself
-//    if (dx == 0 && dy == 0) return {
-//      x: xB,
-//      y: yB
-//    };
-//    const tan_phi = h / w;
-//    const tan_theta = Math.abs(dy / dx);
-//  
-//    //tell me in which quadrant the A point is
-//    const qx = Math.sign(dx);
-//    const qy = Math.sign(dy);
-//
-//    let xI = 0, yI = 0;
-//  
-//    if (tan_theta > tan_phi) {
-//      xI = xB + (h / tan_theta) * qx;
-//      yI = yB + h * qy;
-//    } else {
-//      xI = xB + w * qx;
-//      yI = yB + w * tan_theta * qy;
-//    }
-//  
-//    return {
-//      x: xI,
-//      y: yI
-//    };
-//      
-//  }
-//
-//  const calculateEdgePoint = (from, to) => { //properly connect elements
-//    const dx = to.x - from.x;
-//    const dy = to.y - from.y;
-//    const length = Math.sqrt(dx * dx + dy * dy);
-//    const ux = dx / length;
-//    const uy = dy / length;
-//  
-//    let fromOffsetX = 0, fromOffsetY = 0, toOffsetX = 0, toOffsetY = 0;
-//  
-//    if (from.type === "place") { //radius for places
-//      fromOffsetX = PLACE_RADIUS * ux;
-//      fromOffsetY = PLACE_RADIUS * uy;
-//    } else { //middle face for transitions
-//      const halfWidth = TRANSITION_WIDTH / 2 ;
-//      const halfHeight = TRANSITION_HEIGHT / 2;
-//  
-//      if (Math.abs(dx) > Math.abs(dy)) {
-//        fromOffsetX = dx > 0 ? halfWidth : -halfWidth;
-//      } else {
-//        fromOffsetY = dy > 0 ? halfHeight : -halfHeight;
-//      }
-//    }
-//  
-//    if (to.type === "place") {
-//      //toOffsetX = -(PLACE_RADIUS+(BORDER_SIZE*5)) * ux; toOffsetY = -(PLACE_RADIUS+(BORDER_SIZE*5)) * uy;
-//      fromOffsetX = PLACE_RADIUS * ux; fromOffsetY = PLACE_RADIUS * uy;
-//    } else {
-//      /*const halfWidth = (TRANSITION_WIDTH / 2) +10;
-//      const halfHeight = (TRANSITION_HEIGHT / 2) +10;*/
-//      const halfWidth = TRANSITION_WIDTH / 2;
-//      const halfHeight = TRANSITION_HEIGHT / 2;
-//  
-//      if (Math.abs(dx) > Math.abs(dy)) {
-//        toOffsetX = dx > 0 ? -halfWidth : halfWidth;
-//      } else {
-//        toOffsetY = dy > 0 ? -halfHeight : halfHeight;
-//      }
-//      let coords = lineIntersectionOnRect(TRANSITION_WIDTH, TRANSITION_HEIGHT, dx, dy, from.x + fromOffsetX, from.y + fromOffsetY);
-//      console.log(coords);
-//      console.log(to.x + toOffsetX + " and " + to.y + toOffsetY);
-//    }
-//  
-//    return {
-//      x1: from.x + fromOffsetX,
-//      y1: from.y + fromOffsetY,
-//      x2: to.x + toOffsetX,
-//      y2: to.y + toOffsetY,
-//    };
-//  };  
-//
-//  return (
-//    <div>
-//      <Topbar />
-//      <div class="container">
-//        <Toolbar />
-//        <svg class="canvas" onClick={CanvasClick} onMouseMove={handleMouseMove}>
-//          
-//
-//          {/* Places */}
-//          {places.map((place) => (
-//            <circle key={place.id} cx={place.x} cy={place.y} r={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE}
-//           /* onClick={(e) => {
-//              e.stopPropagation();
-//              if (mode === "arc") {
-//                if (connectingFrom) {
-//                  completeConnection(place.id);
-//                  setMousePos(null); // Clears the preview line
-//                } else {
-//                  startConnection(place.id);
-//                }
-//              }
-//            }}  */
-//            onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(place.id); }}
-//            onMouseUp={(e) => {
-//              e.stopPropagation();
-//              handleMouseUp(place.id);
-//              //if (mode === "arc") {
-//                if (connectingFrom) {
-//                  completeConnection(place.id);
-//                  setMousePos(null); // Clears the preview line
-//                } else {
-//                  startConnection(place.id);
-//                }
-//              //}
-//            }}
-//          />
-//          ))}
-//
-//          {/* Transitions */}
-//          {transitions.map((transition) => (
-//            <rect key={transition.id} x={transition.x - TRANSITION_WIDTH/2} y={transition.y - TRANSITION_HEIGHT/2}
-//            width={TRANSITION_WIDTH} height={TRANSITION_HEIGHT} fill="white" stroke="black" strokeWidth={BORDER_SIZE}
-//            /*onClick={(e) => {
-//              e.stopPropagation();
-//              if (mode === "arc") {
-//                if (connectingFrom) {
-//                  completeConnection(transition.id);
-//                  setMousePos(null); // Clears the preview line
-//                } else {
-//                  startConnection(transition.id);
-//                }
-//              }
-//            }}*/
-//            onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(transition.id); }}
-//            onMouseUp={(e) => {
-//              e.stopPropagation();
-//              handleMouseUp(transition.id);
-//              //if (mode === "arc") {
-//                if (connectingFrom) {
-//                  completeConnection(transition.id);
-//                  setMousePos(null); // Clears the preview line
-//                } else {
-//                  startConnection(transition.id);
-//                }
-//              //}
-//            }}/>
-//          ))}
-//
-//          {/* Arrowhead */}
-//          <defs>
-//            <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="strokeWidth">
-//              <path d="M 0 0 L 10 5 L 0 10 L 5 5 z" fill="black"/>
-//            </marker>
-//          </defs>
-//
-//          {/* Arcs (with arrow) */}
-//          {arcs.map((arc, index) => {
-//            const from = [...places, ...transitions].find((el) => el.id === arc.from);
-//            const to = [...places, ...transitions].find((el) => el.id === arc.to);
-//
-//            if (!from || !to) return null;
-//              
-//            const { x1, y1, x2, y2 } = calculateEdgePoint(from, to);
-//
-//            //vector direction
-//            /*const dx = to.x - from.x;
-//            const dy = to.y - from.y;
-//            const length = Math.sqrt(dx * dx + dy * dy);
-//
-//            //normalize vector
-//            const ux = dx / length;
-//            const uy = dy / length;
-//
-//            //
-//            const fromRadius = from.id.startsWith("P") ? PLACE_RADIUS : TRANSITION_WIDTH/2;
-//            const toRadius = to.id.startsWith("P") ? PLACE_RADIUS : TRANSITION_WIDTH/2;
-//
-//            //adjust start and end points
-//            const x1 = from.x + ux * fromRadius;
-//            const y1 = from.y + uy * fromRadius;
-//            const x2 = to.x - ux * toRadius;
-//            const y2 = to.y - uy * toRadius;*/
-//
-//            return (
-//              <line key={index} x1={x1} y1={y1} x2={x2} y2={y2} stroke="black" strokeWidth={BORDER_SIZE} markerEnd="url(#arrow)" // Arrowhead always visible
-//              />
-//            );
-//            /*return (
-//              <line key={index} x1={x1} y1={y1} x2={x2} y2={y2} stroke="black" strokeWidth={BORDER_SIZE} markerEnd="url(#arrow)" // Arrowhead always visible
-//              />
-//            );*/
-//          })}
-//
-//          {/* Temporary arc preview while connecting */}
-//          {/*connectingFrom && mousePos && (
-//            <line x1={places.find((p) => p.id === connectingFrom)?.x || transitions.find((t) => t.id === connectingFrom)?.x}
-//                  y1={places.find((p) => p.id === connectingFrom)?.y || transitions.find((t) => t.id === connectingFrom)?.y}
-//                  x2={mousePos.x} y2={mousePos.y}*/
-//          draggingArc && mousePos && (
-//            <line x1={places.find((p) => p.id === draggingArc)?.x || transitions.find((t) => t.id === draggingArc)?.x}
-//                  y1={places.find((p) => p.id === draggingArc)?.y || transitions.find((t) => t.id === draggingArc)?.y}
-//                  x2={mousePos.x} y2={mousePos.y}
-//                  stroke="gray" strokeWidth={BORDER_SIZE} strokeDasharray="5,5" />
-//          )}
-//        </svg>
-//        {/*<Properties />*/}
-//      </div>
-//    </div>
-//  );
-//};
-//
-//export default App;

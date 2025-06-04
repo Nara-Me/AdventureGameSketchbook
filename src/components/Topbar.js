@@ -47,7 +47,7 @@ function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId }) {
         style={{ color: "#444746", marginRight: "8px" }}
       />
       Scenes Overview</div>
-    <button className="play-button"
+    {/*<button className="play-button"
       onClick={() => setMode(mode === "edit" ? "run" : "edit")}
     >
       <FontAwesomeIcon
@@ -56,7 +56,7 @@ function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId }) {
         style={{ color: "#444746", marginRight: "8px" }}
       />
       {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
-    </button>
+    </button>*/}
     <div className="scenes-container" style={{ display: "flex", gap: "10px" }}>
         {scenes.map((scene) => (
           <img
