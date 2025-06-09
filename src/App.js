@@ -1,61 +1,62 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Stage, Layer, Circle, Rect, Arrow, Text, Image, Group } from "react-konva";
 import useImage from "use-image";
+
 import Topbar from "./components/Topbar.js";
 import Toolbar from "./components/Toolbar.js";
 import Properties from "./components/Propertybar.js";
 
 import LoadImage from "./components/LoadImage";
 
-// Predefined assets
-/*const assets = {
-  key: require("./assets/imgs/objects/RPG_key.png"),
-  door: require("./assets/imgs/objects/door.png"),
-  sound1: new Audio(require("./assets/audio/yippee-tbh-creature-jazz.mp3")),
-};*/
+const WORKSPACE_SIZE = 5000;
+
+const GAP_SIZE = 7; //7
+const BORDER_SIZE = 2;
+const PLACE_RADIUS = 20; //20
+const TRANSITION_WIDTH = 100;
+const TRANSITION_HEIGHT = 40;
+const debug = false; // true to show edit mode when "running"
 
 const App = () => {
-  const GAP_SIZE = 7; //7
-  const BORDER_SIZE = 2;
-  const PLACE_RADIUS = 20; //20
-  const TRANSITION_WIDTH = 100;
-  const TRANSITION_HEIGHT = 40;
-  const debug = false; // true to show edit mode when "running"
+  const width= window.innerWidth;
+  const height= window.innerHeight;
 
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+  // workplace const
+  const [workspaceScale, setWorkspaceScale] = useState(1);
+  const [workspacePosition, setWorkspacePosition] = useState({ x: 0, y: 0 });
+  //const [isElementDragging, setIsElementDragging] = useState(false);
+  const workspaceRef = useRef(null);
   const stageRef = useRef(null);
 
-  const handleWheel = (e) => { //taken from the konva docs
+  const handleWheel = (e) => { //demo taken (and adapted) from konva
     e.evt.preventDefault();
+    const scaleBy = 1.05;
+    const oldScale = workspaceScale;
+    const pointer = stageRef.current.getPointerPosition();
 
-    const stage = stageRef.current;
-    const oldScale = stage.scaleX();
-    const pointer = stage.getPointerPosition();
-
+    // Convert pointer to workspace coordinates
+    const group = workspaceRef.current;
+    const groupPos = group.getAbsolutePosition();
     const mousePointTo = {
-      x: (pointer.x - stage.x()) / oldScale,
-      y: (pointer.y - stage.y()) / oldScale,
+      x: (pointer.x - groupPos.x) / oldScale,
+      y: (pointer.y - groupPos.y) / oldScale,
     };
 
-    // how to scale? Zoom in? Or zoom out?
-    let direction = e.evt.deltaY > 0 ? 1 : -1;
+    // Calculate new scale
+    let newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
+    newScale = Math.max(0.1, Math.min(3, newScale));
 
-    const scaleBy = 1.03;
-    const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
-
-    stage.scale({ x: newScale, y: newScale });
-
+    // Calculate new position to keep pointer under mouse
     const newPos = {
       x: pointer.x - mousePointTo.x * newScale,
       y: pointer.y - mousePointTo.y * newScale,
     };
-    stage.position(newPos);
+
+    setWorkspaceScale(newScale);
+    setWorkspacePosition(newPos);
   };
 
-  //const [places, setPlaces] = useState([]);
-  //const [transitions, setTransitions] = useState([]);
-  //const [arcs, setArcs] = useState([]);
+  // elements (places, transitions, arcs) const
   const [selectedElement, setSelectedElement] = useState(null);
   const [mode, setMode] = useState("edit"); // Modes: "edit", "run", and maybe "overview"
   const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows
@@ -64,8 +65,14 @@ const App = () => {
   const [nextPlaceId, setNextPlaceId] = useState(1);
   const [nextTransitionId, setNextTransitionId] = useState(1);
 
-  const [character, setCharacter] = useState({ x: 100, y: 600, size: 80 });
+  // asset library const
+  const [userImages, setUserImages] = useState([]); //images from user in asset library
+  const [userAudios, setUserAudios] = useState([]); //audios from user in asset library
+  const [showAssetLibrary, setShowAssetLibrary] = useState(false);
 
+  const [character, setCharacter] = useState({ x: 100, y: 600, size: 80 }); // controlable character in run mode
+
+  // scenes const
   const [scenes, setScenes] = useState([ //array of preloaded scenes for testing
     {
       id: 1,
@@ -99,11 +106,34 @@ const App = () => {
       transitions: [],
       arcs: [],
     },
+    {
+      id: 5,
+      name: "Grasslands",
+      background: "./assets/imgs/scenes/grasslands_scene.png",
+      places: [],
+      transitions: [],
+      arcs: [],
+    },
   ]);
-  
   const [currentSceneId, setCurrentSceneId] = useState(1); //default to the first scene
-
   const currentScene = scenes.find((scene) => scene.id === currentSceneId);
+
+  const handleAddScene = () => { //NEEDS TO BE REVAMPED
+    const url = window.prompt("Enter image URL for new scene:");
+    if (url) {
+      setScenes(prev => [
+        ...prev,
+        {
+          id: prev.length + 1,
+          name: `Scene ${prev.length + 1}`,
+          background: url,
+          places: [],
+          transitions: [],
+          arcs: [],
+        }
+      ]);
+    }
+  };
 
   useEffect(() => { //flip modes with esc key
     const handleEsc = (e) => {
@@ -114,6 +144,28 @@ const App = () => {
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
   }, []);
+
+  const handleImageUpload = (e) => { //allows for image upload from users
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setUserImages(prev => [...prev, { src: ev.target.result, name: file.name }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAudioUpload = (e) => { //allows for audio upload from users
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setUserAudios(prev => [...prev, { src: ev.target.result, name: file.name }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
 
   const isOverlapping = (x, y) => { //when placing an element, check if there is one already
     return (
@@ -150,7 +202,7 @@ const App = () => {
     return [x1, y1, x2, y2];
   };
 
-  const handleStageClick = (e) => { //handel clicking on the canvas
+  const handleStageClick = (e) => { //handle clicking on the canvas
     
     if (e.target === e.target.getStage()) { //clicked the canvas but not an element
       setConnectingFrom(null); //cancell connection if there is one
@@ -160,8 +212,16 @@ const App = () => {
     }
     if (e.evt.button !== 0 || mode !== "edit") return; //return if not in edit mode
     
-    const { x, y } = e.target.getStage().getPointerPosition();
+    // Convert pointer position to workspace coordinates
+    const pointer = stageRef.current.getPointerPosition();
+    const group = workspaceRef.current;
+    const groupPos = group.getAbsolutePosition();
+    const x = (pointer.x - groupPos.x) / workspaceScale;
+    const y = (pointer.y - groupPos.y) / workspaceScale;
+
+    //const { x, y } = e.target.getStage().getPointerPosition();
     if (isOverlapping(x, y)) {
+      // do nothing if overlapping
       //console.log("overlapping with another");
       return;}
 
@@ -197,11 +257,6 @@ const App = () => {
     }
 
     if (mode === "edit") {
-      /*const element = type === "place"
-      ? currentScene.places.find((p) => p.id === id)
-      : currentScene.transitions.find((t) => t.id === id);
-
-      setSelectedElement({ id, type, asset: element?.asset || null });*/
 
       let element;
       if (type === "place") {
@@ -233,7 +288,6 @@ const App = () => {
         //console.log("connecting");
       } else if (connectingFrom.id !== id && connectingFrom.type !== type) {
         //console.log("connected");
-        //setArcs([...arcs, { from: connectingFrom, to: { id, type } }]);
         const updatedScenes = scenes.map((scene) =>
           scene.id === currentSceneId
             ? {
@@ -257,6 +311,9 @@ const App = () => {
   };
 
   const handleDragMove = (e, id, type) => { //handle dragging of the elements
+    //setStagePosition(e.target.position());
+    const group = workspaceRef.current;
+    const groupPos = group.getAbsolutePosition();
     const { x, y } = e.target.position();
 
     const updatedScenes = scenes.map((scene) =>
@@ -271,22 +328,6 @@ const App = () => {
   );
 
   setScenes(updatedScenes);
-
-    /*if (type === "place") {
-      setPlaces((prev) => prev.map((p) => (p.id === id ? { ...p, x, y } : p)));
-    } else if (type === "transition") {
-      setTransitions((prev) => prev.map((t) => (t.id === id ? { ...t, x, y } : t)));
-      /*setTransitions((prev) => //centers the rectangle but jitters AAAA
-        prev.map((t) => {
-          if (t.id === id) {
-            const newX = x - (TRANSITION_WIDTH / 2);
-            const newY = y - (TRANSITION_HEIGHT / 2);
-            return { ...t, x: newX, y: newY };
-          }
-          return t;
-        })
-      );*/
-    /*}*/
   };
 
   const handleContextMenu = (e, id, type) => { //right click on an element
@@ -354,68 +395,8 @@ const App = () => {
     );
   };
 
-/*   const updateElementAsset = (id, type, { image, sound, allowPartialFiring, position }) => {
-    // Loop through each scene
-    const updatedScenes = scenes.map((scene) => {
-      if (scene.id === currentSceneId) {
-        //check which type to update
-        const typeUpdate = type === "place" ? "places" : "transitions";
-      
-        scene[typeUpdate] = scene[typeUpdate].map((element) => {
-          if (element.id === id) {
-            const updatedElement = {
-            //return {
-              ...element, //keep the other properties
-              asset: { image, sound, position }, //update asset
-              allowPartialFiring: allowPartialFiring ?? element.allowPartialFiring, //not working??? visual reset but "works"
-            };
-            /*if (type === "transition" && position) { //
-              Object.assign(updatedElement, position);
-            }*/
-            /*return updatedElement;
-
-          } else {
-            //if not the selected element, do nothing
-            return element;
-          }
-        });
-      
-        return scene;
-      }
-    
-      return scene; //if not the current scene, do nothing
-    });
-  
-    setScenes(updatedScenes);
-
-    if (type === "place") {
-      setPlaces((prev) =>
-        prev.map((p) =>
-          p.id === id ? { ...p, asset: { image, sound, position } } : p
-        )
-      );
-    } else if (type === "transition") { 
-      setTransitions((prev) =>
-        prev.map((t) =>
-          t.id === id
-            ? { ...t, asset: { image, sound, position }, allowPartialFiring: allowPartialFiring ?? t.allowPartialFiring } //question mark is optional chaining (so no nulls)
-            : t
-        )
-      );
-    }
-  
-    //update the selectedElement if it matches the updated element
-    if (selectedElement?.id === id && selectedElement?.type === type) {
-      setSelectedElement((prev) => ({
-        ...prev,
-        asset: { image, sound , position},
-        allowPartialFiring: allowPartialFiring ?? prev.allowPartialFiring,
-      }));
-    }
-  }; */
-
   const updateElementAsset = (id, type, asset, allowPartialFiring) => {
-    //updates the scene array
+    //updates the scene's array
     const updatedScenes = scenes.map((scene) => { //loops through all the scenes and only updates the current one
       if (scene.id === currentSceneId) {
         const typeUpdate = type === "place" ? "places" : "transitions"; //updates either places or transitions
@@ -446,6 +427,10 @@ const App = () => {
         ...(typeof allowPartialFiring !== "undefined"
           ? { allowPartialFiring }
           : {}),
+          /*allowPartialFiring:
+            typeof allowPartialFiring !== "undefined"
+              ? allowPartialFiring
+              : prev.allowPartialFiring,*/
       }));
     }
   };
@@ -511,12 +496,15 @@ const App = () => {
         if (e.key === "ArrowRight") x += step;
         return { ...prev, x, y };
       });
-      if (e.key === " ") { // Spacebar
-        //check proximity to transitions
+      if (e.key === " ") { //spacebar key
+        //check proximity to set assets
         currentScene.transitions.forEach((t) => {
+          if (!t.asset || !t.asset.assetPosition) return; //return nothing if t.asset doesnt exist
           const dx = character.x - t.asset.assetPosition?.x;
           const dy = character.y - t.asset.assetPosition?.y;
+          //console.log(character.x + " , " + character.y + " and " + dx + " , " + dy);
           if (Math.sqrt(dx * dx + dy * dy) < 40) {
+            console.log("interacted");
             fireTransition(t.id);
           }
         });
@@ -536,86 +524,147 @@ const App = () => {
       scenes={scenes}
       currentSceneId={currentSceneId}
       setCurrentSceneId={setCurrentSceneId}
+      onAddScene={handleAddScene}
       />
       <div className="container">
-      <Toolbar selectedTool={selectedTool} setSelectedTool={setSelectedTool} />
-      {console.log(mode)}
-        <Stage className="canvas" width={1000} height={height} onClick={handleStageClick} ref={stageRef} onWheel={handleWheel} /*draggable*/>
-          <Layer>
-          {/* Render Places */}
-          {currentScene.places.map((p) => (
-            <Group
-              key={p.id}
-              x={p.x}
-              y={p.y}
-              draggable
-              onClick={() => handleElementClick(p.id, "place")}
-              onDragMove={(e) => handleDragMove(e, p.id, "place")}
-              onContextMenu={(e) => handleContextMenu(e, p.id, "place")}
-            >
-              <Circle
-                radius={PLACE_RADIUS}
-                fill="white"
-                stroke="black"
-                strokeWidth={BORDER_SIZE}
-              />
-              {p.asset?.image && <AssetRenderer x={0} y={0} asset={p.asset} />}
-              <Text
-                x={-5}
-                y={-5}
-                text={p.tokens.toString()}
-                fontSize={14}
-                fill="black"
-              />
-            </Group>
-          ))}
+      <Toolbar
+        //tools
+        selectedTool={selectedTool}
+        setSelectedTool={setSelectedTool}
 
-          {/* Render Transitions */}
-          {currentScene.transitions.map((t) => (
-            <Group
-              key={t.id}
-              x={t.x}
-              y={t.y}
-              draggable
-              onClick={() => handleElementClick(t.id, "transition")}
-              onDragMove={(e) => handleDragMove(e, t.id, "transition")}
-              onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
+        //assets library
+        showAssetLibrary={showAssetLibrary}
+        setShowAssetLibrary={setShowAssetLibrary}
+        userImages={userImages}
+        userAudios={userAudios}
+        handleImageUpload={handleImageUpload}
+        handleAudioUpload={handleAudioUpload}
+        availableImages={[
+          { type: "image", src: "./assets/imgs/objects/door.png" },
+          { type: "image", src: "./assets/imgs/objects/RPG_key.png" },
+          { type: "image", src: "./assets/imgs/objects/RPG_NPC.png" },
+          { type: "image", src: "./assets/imgs/objects/RPG_bag.png" },
+        ]}
+        availableSounds={[
+          { type: "audio", src: "./assets/audio/yippee-tbh-creature-jazz.mp3" },
+        ]}
+        onSelectImage={img => {/* logic to use selected image */}}
+        onSelectAudio={aud => {/* logic to use selected audio */}}
+      />
+        <Stage className="canvas" width={width+100} height={height+100} onClick={handleStageClick} /*scaleX={stageScale} scaleY={stageScale} x={stagePosition.x} y={stagePosition.y}*/ ref={stageRef} onWheel={handleWheel} /*draggable*/>
+          <Layer>
+            <Group //working area to place elements
+              ref={workspaceRef}
+              //draggable={!isElementDragging}
+              x={workspacePosition.x}
+              y={workspacePosition.y}
+              scaleX={workspaceScale}
+              scaleY={workspaceScale}
+              //onDragMove={e => setWorkspacePosition(e.target.position())}
             >
-              {t.asset?.image && <AssetRenderer x={0} y={-TRANSITION_HEIGHT*2.9} asset={t.asset} />}
-              <Rect
-                x={-TRANSITION_WIDTH/2}
-                y={-TRANSITION_HEIGHT/2}
-                width={TRANSITION_WIDTH}
-                height={TRANSITION_HEIGHT}
-                fill="white"
-                stroke="black"
-                strokeWidth={BORDER_SIZE}
-                cornerRadius={5}
+              <Rect //visible working area
+                x={-WORKSPACE_SIZE/2}
+                y={-WORKSPACE_SIZE/2}
+                width={WORKSPACE_SIZE}
+                height={WORKSPACE_SIZE}
+                fill="#a4a7df"
+                stroke="#bbb"
+                strokeWidth={4}
+                listening={false}
               />
-              <Text
-                x={-TRANSITION_WIDTH / 4}
-                y={-TRANSITION_HEIGHT / 2 + 12}
-                text={"Action"}
-                fontSize={14}
-                fill="black"
-              />
+              {/* Render Places */}
+              {currentScene.places.map((p) => (
+              <Group
+                key={p.id}
+                x={p.x}
+                y={p.y}
+                draggable
+                onClick={() => handleElementClick(p.id, "place")}
+                onDragMove={(e) => handleDragMove(e, p.id, "place")}
+                /*onDragStart={e => {
+                  setIsElementDragging(true);
+                  e.cancelBubble = true;
+                }}
+                onDragEnd={e => {
+                  setIsElementDragging(false);
+                  e.cancelBubble = true;
+                  handleDragMove(e, p.id, "place");
+                }}*/
+                onContextMenu={(e) => handleContextMenu(e, p.id, "place")}
+              >
+                <Circle
+                  radius={PLACE_RADIUS}
+                  fill="white"
+                  stroke="black"
+                  strokeWidth={BORDER_SIZE}
+                />
+                {p.asset?.image && <AssetRenderer x={0} y={0} asset={p.asset} />}
+                <Text
+                  x={-5}
+                  y={-5}
+                  text={p.tokens.toString()}
+                  fontSize={14}
+                  fill="black"
+                />
+              </Group>
+              ))}
+  
+              {/* Render Transitions */}
+              {currentScene.transitions.map((t) => (
+              <Group
+                key={t.id}
+                x={t.x}
+                y={t.y}
+                draggable
+                onClick={() => handleElementClick(t.id, "transition")}
+                onDragMove={(e) => handleDragMove(e, t.id, "transition")}
+                /*onDragStart={e => {
+                  setIsElementDragging(true);
+                  e.cancelBubble = true;
+                }}
+                onDragEnd={e => {
+                  setIsElementDragging(false);
+                  e.cancelBubble = true;
+                  handleDragMove(e, t.id, "transition");
+                }}*/
+                onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
+              >
+                {t.asset?.image && <AssetRenderer x={0} y={-TRANSITION_HEIGHT*2.9} asset={t.asset} />}
+                <Rect
+                  x={-TRANSITION_WIDTH/2}
+                  y={-TRANSITION_HEIGHT/2}
+                  width={TRANSITION_WIDTH}
+                  height={TRANSITION_HEIGHT}
+                  fill="white"
+                  stroke="black"
+                  strokeWidth={BORDER_SIZE}
+                  cornerRadius={5}
+                />
+                <Text
+                  x={-TRANSITION_WIDTH / 4}
+                  y={-TRANSITION_HEIGHT / 2 + 12}
+                  text={"Action"}
+                  fontSize={14}
+                  fill="black"
+                />
+              </Group>
+              ))}  
+              {/* Render Arcs */}
+              {currentScene.arcs.map((arc, index) => (
+                <Arrow
+                  key={index}
+                  points={calculateArrowPoints(arc.from, arc.to)}
+                  stroke="black" fill="white"
+                  lineCap="round" lineJoin="round"
+                  pointerLength={12} pointerWidth={15}
+                  //dashEnabled dash={20}
+                  //bezier="true" tension={5}
+                  strokeWidth={BORDER_SIZE}
+                  hitStrokeWidth={BORDER_SIZE+8}
+                  onContextMenu={(e) => handleContextMenu(e, index, "arc")}
+                />
+              ))}
             </Group>
-          ))}  
-          {/* Render Arcs */}
-          {currentScene.arcs.map((arc, index) => (
-              <Arrow
-                key={index}
-                points={calculateArrowPoints(arc.from, arc.to)}
-                stroke="black" fill="white"
-                lineCap="round" lineJoin="round"
-                pointerLength={12} pointerWidth={15}
-                //dashEnabled dash={20}
-                //bezier="true" tension={5}
-                strokeWidth={BORDER_SIZE}
-                hitStrokeWidth={BORDER_SIZE+8}
-                onContextMenu={(e) => handleContextMenu(e, index, "arc")}
-              />
-            ))}
           </Layer>
         </Stage>
         {
@@ -646,8 +695,8 @@ const App = () => {
                   t.asset?.image ? (
                     <LoadImage
                       key={t.id}
-                      x={t.asset.assetPosition?.x ?? width/4}
-                      y={t.asset.assetPosition?.y ?? height/4}
+                      x={t.asset.assetPosition?.x ?? 50}
+                      y={t.asset.assetPosition?.y ?? 0}
                       src={t.asset.image.src}
                       width={100}
                       height={200}

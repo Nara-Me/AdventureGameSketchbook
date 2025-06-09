@@ -16,7 +16,8 @@ const LoadImage = ({ x, y, src, width = 50, height = 50 }) => { // used to load 
     drawWidth = height * aspectRatio;
   }
 
-  return <Image x={x} y={y} image={image} width={drawWidth} height={drawHeight} />;
+  return <Image x={x} y={y - drawHeight} image={image} width={drawWidth} height={drawHeight} />;
+  //return <Image x={x} y={y - width} image={image} width={width} height={height} />;
 };
 
 export default LoadImage;

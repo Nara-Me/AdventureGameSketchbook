@@ -1,8 +1,8 @@
 import React from "react";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+/*import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faPlay } from '@fortawesome/free-solid-svg-icons'
 import { faPause } from '@fortawesome/free-solid-svg-icons'
-import { faSitemap } from '@fortawesome/free-solid-svg-icons'
+import { faSitemap } from '@fortawesome/free-solid-svg-icons'*/
 /*import { faStop } from '@fortawesome/free-solid-svg-icons'
 import { faCirclePlus } from '@fortawesome/free-solid-svg-icons'
 import { faCircleUser } from '@fortawesome/free-solid-svg-icons'
@@ -27,7 +27,7 @@ import App from "../App";*/
   );
 };*/
 
-function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId }) {
+function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId, onAddScene }) {
   //const [selectedScene, setSelectedScene] = useState(null);
 
   //backgrounds that can be selected
@@ -40,13 +40,16 @@ function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId }) {
 
   return (
     <div className="top-bar">
-    <div className="name">
+      <div className="name">
+        <p>name <br/> logo</p>
+      </div>
+    {/*<div className="name">
     <FontAwesomeIcon
         icon={faSitemap}
         size="xxl"
         style={{ color: "#444746", marginRight: "8px" }}
       />
-      Scenes Overview</div>
+      Scenes Overview</div>*/}
     {/*<button className="play-button"
       onClick={() => setMode(mode === "edit" ? "run" : "edit")}
     >
@@ -57,21 +60,18 @@ function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId }) {
       />
       {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
     </button>*/}
-    <div className="scenes-container" style={{ display: "flex", gap: "10px" }}>
+    <div className="scenes-container">
         {scenes.map((scene) => (
           <img
             key={scene.id}
             src={scene.background}
             alt={scene.name}
-            width={scene.background.width}
             height={80}
-            style={{
-              border: scene.id === currentSceneId ? "2px solid blue" : "2px solid gray",
-              cursor: "pointer",
-            }}
+            className={scene.id === currentSceneId ? "selected" : ""}
             onClick={() => setCurrentSceneId(scene.id)}
           />
         ))}
+        <button className="add-scene-btn" onClick={onAddScene}>＋</button>
       </div>
     </div>
   );

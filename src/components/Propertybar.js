@@ -5,10 +5,12 @@ import React, { useState, useEffect } from "react";
 
 const Properties = ({ selectedElement, updateElementAsset }) => {
   //variables to store the selected image, sound
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [selectedSound, setSelectedSound] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null); //selected image for each element
+  const [selectedSound, setSelectedSound] = useState(null); //selected sound for each element
   //const [allowPartialFiring, setAllowPartialFiring] = useState(false);
-  const [isImageSelectorOpen, setIsImageSelectorOpen] = useState(false);
+  const [isImageSelectorOpen, setIsImageSelectorOpen] = useState(false); //image asset menu in properties
+  const [assetNaturalSize, setAssetNaturalSize] = useState({ width: 1, height: 1 }); //image size in run mode set in properties
+  const [aspectLocked, setAspectLocked] = useState(true); //lock the aspect ratio of the images in run mode or not
 
   //images and sounds that can be selected
   const availableImages = [
@@ -31,6 +33,15 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
       //setAllowPartialFiring(selectedElement.allowPartialFiring || false);
     }
   }, [selectedElement]);
+  
+  useEffect(() => {
+   // When image changes, update natural size
+    if (selectedImage?.src) {
+      const img = new window.Image();
+      img.onload = () => setAssetNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+      img.src = selectedImage.src;
+    }
+  }, [selectedImage]);
 
   //if no element is selected, hide the properties bar
   if (!selectedElement) {
@@ -78,16 +89,53 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
           ...selectedElement.asset, //keep all other properties unchanged!
           
         },
-        isChecked,
+        !isChecked,
       );
     }
   };
 
+  const assetSize = selectedElement.asset?.assetSize || { width: 50, height: 50 };
+  const aspectRatio = assetNaturalSize.width / assetNaturalSize.height;
+
+  const handleAssetWidthChange = (e) => {
+    const width = Number(e.target.value);
+    let height = assetSize.height;
+    if (aspectLocked) {
+      height = Math.round(width / aspectRatio);
+    }
+    updateElementAsset(
+      selectedElement.id,
+      selectedElement.type,
+      {
+        ...selectedElement.asset,
+        assetSize: { width, height },
+      },
+      selectedElement.allowPartialFiring,
+    );
+  };
+
+  const handleAssetHeightChange = (e) => {
+    const height = Number(e.target.value);
+    let width = assetSize.width;
+    if (aspectLocked) {
+      width = Math.round(height * aspectRatio);
+    }
+    updateElementAsset(
+      selectedElement.id,
+      selectedElement.type,
+      {
+        ...selectedElement.asset,
+        assetSize: { width, height },
+      },
+      selectedElement.allowPartialFiring,
+    );
+  };
+
   return (
     <div className="properties-sidebar">
-      <h3>Properties</h3>
-      <p>ID: {selectedElement.id}</p>
-      <p>Type: {selectedElement.type}</p>
+      <h3>Name of {selectedElement.type} {selectedElement.id}</h3>
+      {/*<p>ID: {selectedElement.id}</p>
+      <p>Type: {selectedElement.type}</p>*/}
 
       {/* Image Selection */}
       <label>
@@ -111,7 +159,7 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
 
       {/* Image Selector */}
       {isImageSelectorOpen && (
-        <div className="image-selector" style={{ position: "relative", top: "20px", background: "white", padding: "20px", border: "1px solid black" }}>
+        <div className="image-selector">
           <h4>Select an Image</h4>
           <div style={{ display: "flex", gap: "10px" }}>
             {availableImages.map((image, index) => (
@@ -119,7 +167,7 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
                 key={index}
                 src={image.src}
                 alt={`image-${index}`}
-                width={50}z
+                width={50}
                 height={50}
                 style={{ cursor: "pointer", border: selectedImage?.src === image.src ? "2px solid blue" : "1px solid gray" }}
                 onClick={() => handleImageSelect(image)} //when an image is clicked, select it
@@ -132,6 +180,38 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
         </div>
       )}
 
+      {/* Image Sizing */}
+      {selectedImage && (
+        <div className="asset-size-controls">
+          <label>
+            Width:
+            <input
+              type="number"
+              value={assetSize.width}
+              min={1}
+              onChange={handleAssetWidthChange}
+              className="asset-size-input"
+            />
+          </label>
+          <label>
+            Height:
+            <input
+              type="number"
+              value={assetSize.height}
+              min={1}
+              onChange={handleAssetHeightChange}
+              className="asset-size-input"
+            />
+          </label>
+          <button
+            onClick={() => setAspectLocked((prev) => !prev)}
+            className="aspect-lock-btn"
+            title={aspectLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
+          >
+            {aspectLocked ? "🔒" : "🔓"}
+          </button>
+        </div>
+      )}
       {/* Image POsition */}
       {/*selectedElement.type === "transition" &&*/ (
         <div>
@@ -198,12 +278,12 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
       {/* Allow Partial Firing option for transitions only */}
       {selectedElement.type === "transition" && (
         <label>
-          Only need one input to activate:
           <input
             type="checkbox"
-            checked={!!selectedElement.allowPartialFiring}
+            checked={!selectedElement.allowPartialFiring}
             onChange={handleAllowPartialFiringChange}
           />
+          Need all inputs tokenized
         </label>
       )}
     </div>
