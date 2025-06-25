@@ -480,19 +480,18 @@ const App = () => {
     //check if all input places have at least one token (for or/and logic)
     const allInputsHaveTokens = inputPlaces.every((id) => (currentScene.places.find((p) => p.id === id)?.tokens || 0) >= 1);
     if (!transition.allowPartialFiring && !allInputsHaveTokens) return;
-    if (transition.allowPartialFiring &&
-        allInputsHaveTokens) return;
+    if (transition.allowPartialFiring && allInputsHaveTokens) return;
   
-    // Track token changes for entry/exit names
+    //track token changes for entry/exit names
     const changedNames = {};
   
-    // 1. Update tokens for input and output places in the current scene
+    //update tokens for input and output places in the current scene
     const updatedScenes = scenes.map((scene) =>
       scene.id === currentSceneId
         ? {
             ...scene,
             places: scene.places.map((p) => {
-              // INPUT: Decrement tokens
+              // INPUT: Decrease num tokens
               if (inputPlaces.includes(p.id)) {
                 if ((p.placeType === "entry" || p.placeType === "exit") && p.name) {
                   const newTokens = Math.max(p.tokens - 1, 0);
@@ -501,7 +500,7 @@ const App = () => {
                 }
                 return { ...p, tokens: Math.max(p.tokens - 1, 0) };
               }
-              // OUTPUT: Increment tokens
+              // OUTPUT: Increment num tokens
               if (outputPlaces.includes(p.id)) {
                 if ((p.placeType === "entry" || p.placeType === "exit") && p.name) {
                   const newTokens = p.tokens + 1;
@@ -516,7 +515,7 @@ const App = () => {
         : scene
     );
   
-    // 2. Synchronize all entry/exit places with the same name to the new value
+    //synchronize all entry/exit places with the same name
     const syncedScenes = updatedScenes.map((scene) => ({
       ...scene,
       places: scene.places.map((place) => {
@@ -529,39 +528,6 @@ const App = () => {
   
     setScenes(syncedScenes);
   };
-
-  /*function transferToken(exitPlace, exitName) {
-    setScenes(prevScenes =>
-      prevScenes.map(scene => ({
-        ...scene,
-        places: scene.places.map(place =>
-          place.placeType === "entry" && place.name === exitName
-            //? { ...place, tokens: (place.tokens || 0) + 1 }
-            ? { ...place, tokens: (exitPlace.tokens || 0) +1 }
-            : place
-        ),
-      }))
-    );
-  }*/
-  /*function transferToken(exitPlace, exitName) {
-    setScenes(prevScenes =>
-      prevScenes.map(scene => ({
-        ...scene,
-        places: scene.places.map(place => {
-
-          if (place.placeType === "entry" && place.name === exitName) {
-            console.log("Matching Place Found:", place); // Log the place that matches the condition
-            console.log("Updating Tokens:", (exitPlace.tokens || 0) + 1); // Log the new token count
-
-            return { ...place, tokens: (place.tokens || 0) + 1 };
-          }
-          console.log("Updated Place:", place); // Log the place that was updated
-
-          return place;
-        }),
-      }))
-    );
-  }*/
   
   useEffect(() => { // IMPROVE IMMENSELLY WALKING AND PROXIMITY SENSOR
     if (mode !== "run") return;

@@ -152,7 +152,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
         </label>
       )}
 
-      {selectedElement.type === "place" && selectedElement.placeType === "normal" && (
+      {selectedElement.placeType !== "entry" && selectedElement.placeType !== "exit" && (
         <>
         {/* Image Selection */}
         <label>
