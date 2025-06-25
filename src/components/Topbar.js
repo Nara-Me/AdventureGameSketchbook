@@ -27,7 +27,7 @@ import App from "../App";*/
   );
 };*/
 
-function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId, onAddScene }) {
+function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId, onAddScene, selectedTool, setSelectedTool }) {
   //const [selectedScene, setSelectedScene] = useState(null);
 
   //backgrounds that can be selected
@@ -39,7 +39,7 @@ function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId, onAd
   ];*/
 
   return (
-    <div className="top-bar">
+    <div className="top-bar" onClick={() => setSelectedTool(selectedTool == null) }>
       <div className="name">
         <p>name <br/> logo</p>
       </div>

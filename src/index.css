@@ -88,6 +88,34 @@ body {
     background: #e0e2f7;
 }
 
+.background-selector-overlay {
+    position: fixed;
+    top:0; left:0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.background-selector {
+    background: var(--shipcove);
+    padding: 32px;
+    border-radius: 12px;
+    min-width: 400px;
+    max-width: 700px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+}
+
+.background-selector-list {
+    width: 120px;
+    height: 80px;
+    object-fit: cover;
+    border: 2px solid #bbb;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
 /* full window edit mode container*/
 .container {
     display: flex;
@@ -133,6 +161,7 @@ body {
     min-width: 200px;
     max-width: 350px;
     flex-shrink: 0;
+    justify-content: space-evenly;
     /*border-right: 1px solid black;*/
 }
 
@@ -183,10 +212,34 @@ body {
     border: 2px solid var(--wildsand);
 }
 
-.tool-btn.place {
+.tool-select-circles {
+    display: flex;
+    justify-content: space-evenly;
+}
+
+.tool-btn.place, .tool-btn.entry, .tool-btn.exit {
     width: 40px;
     height: 40px;
     border-radius: 50%;
+    justify-content: center;
+    display: flex;
+}
+
+.tool-btn.entry .entry {
+    width: 10px;
+    height: 10px;
+    background-color: #111;
+    border-radius: 50%;
+    position: relative;
+    top: 15px;
+}
+
+.tool-btn.exit .exit{
+    width: 2px;
+    height: 2px;
+    background-color: #111;
+    position: relative;
+    top: 15px;
 }
 
 .tool-btn.arc {
@@ -205,8 +258,7 @@ body {
     padding: 10px;
 }
 
-.asset-library-images,
-.asset-library-audios {
+.asset-library-images, .asset-library-audios {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
@@ -264,6 +316,30 @@ body {
     border: 2px solid #bbb;
     border-radius: 8px;
     margin: 4px;
+}
+
+.asset-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    font-size: 36px;
+    background: var(--coldpurple);
+    border: 2px solid var(--wildsand);
+    border-radius: 8px;
+    color: #222;
+    cursor: pointer;
+    margin: 4px;
+    transition: background 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+.asset-upload-btn:hover {
+    background: #e0e2f7;
+}
+.asset-upload-btn input[type="file"] {
+    display: none;
 }
 
 /* Properties Styles*/
@@ -324,4 +400,14 @@ body {
 .bg-blue {
     cursor: pointer;
     background-color: lightblue;
+}
+
+.scene-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: black;
 }

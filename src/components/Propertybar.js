@@ -1,9 +1,6 @@
-// FIX THIS: the checkmark in properties disappears after updating the bar and resets it.
-
-
 import React, { useState, useEffect } from "react";
 
-const Properties = ({ selectedElement, updateElementAsset }) => {
+const Properties = ({ selectedElement, updateElementAsset, availableImages, availableSounds, selectedTool, setSelectedTool }) => {
   //variables to store the selected image, sound
   const [selectedImage, setSelectedImage] = useState(null); //selected image for each element
   const [selectedSound, setSelectedSound] = useState(null); //selected sound for each element
@@ -13,7 +10,7 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
   const [aspectLocked, setAspectLocked] = useState(true); //lock the aspect ratio of the images in run mode or not
 
   //images and sounds that can be selected
-  const availableImages = [
+  /*const availableImages = [
     { type: "image", src: "./assets/imgs/objects/door.png" },
     { type: "image", src: "./assets/imgs/objects/RPG_key.png" },
     { type: "image", src: "./assets/imgs/objects/RPG_NPC.png" },
@@ -22,7 +19,7 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
 
   const availableSounds = [
     { type: "audio", src: "./assets/audio/yippee-tbh-creature-jazz.mp3" },
-  ];
+  ];*/
 
   //update the component when the selectedElement asset changes
   useEffect(() => {
@@ -75,7 +72,7 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
     }
   };
 
-  //toggle the Allow Partial Firing checkbox (visually resets the bar for some reason)
+  //toggle the Allow Partial Firing checkbox
   const handleAllowPartialFiringChange = (e) => {
     const isChecked = e.target.checked;
     //console.log(selectedElement.allowPartialFiring);
@@ -86,7 +83,7 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
         selectedElement.id,
         selectedElement.type,
         {
-          ...selectedElement.asset, //keep all other properties unchanged!
+          ...selectedElement.asset, //keep all other properties unchanged
           
         },
         !isChecked,
@@ -94,7 +91,7 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
     }
   };
 
-  const assetSize = selectedElement.asset?.assetSize || { width: 50, height: 50 };
+  const assetSize = selectedElement.asset?.assetSize || { width: 50, height: 50 }; //sets size to 50 by 50
   const aspectRatio = assetNaturalSize.width / assetNaturalSize.height;
 
   const handleAssetWidthChange = (e) => {
@@ -132,160 +129,181 @@ const Properties = ({ selectedElement, updateElementAsset }) => {
   };
 
   return (
-    <div className="properties-sidebar">
-      <h3>Name of {selectedElement.type} {selectedElement.id}</h3>
-      {/*<p>ID: {selectedElement.id}</p>
-      <p>Type: {selectedElement.type}</p>*/}
+    <div className="properties-sidebar" onClick={() => setSelectedTool(selectedTool == null) }>
+      <h3>{selectedElement.name || "Undefined"}</h3>
 
-      {/* Image Selection */}
-      <label>
-        Image:
-        <button onClick={() => setIsImageSelectorOpen(true)}>Select Image</button>
-        <button onClick={handleClearImage} style={{ marginLeft: "10px" }}>
-          Clear Image
-        </button>
-      </label>
-      
-      {/* Show selected image thumbnail if an image is selected */}
-      {selectedImage && (
-        <img
-          src={selectedImage.src}
-          alt="Selected"
-          width={50}
-          height={50}
-          style={{ display: "block", marginTop: "10px" }}
-        />
-      )}
-
-      {/* Image Selector */}
-      {isImageSelectorOpen && (
-        <div className="image-selector">
-          <h4>Select an Image</h4>
-          <div style={{ display: "flex", gap: "10px" }}>
-            {availableImages.map((image, index) => (
-              <img
-                key={index}
-                src={image.src}
-                alt={`image-${index}`}
-                width={50}
-                height={50}
-                style={{ cursor: "pointer", border: selectedImage?.src === image.src ? "2px solid blue" : "1px solid gray" }}
-                onClick={() => handleImageSelect(image)} //when an image is clicked, select it
-              />
-            ))}
-          </div>
-          <button onClick={() => setIsImageSelectorOpen(false)} style={{ marginTop: "10px" }}>
-            Close
-          </button>
-        </div>
-      )}
-
-      {/* Image Sizing */}
-      {selectedImage && (
-        <div className="asset-size-controls">
-          <label>
-            Width:
-            <input
-              type="number"
-              value={assetSize.width}
-              min={1}
-              onChange={handleAssetWidthChange}
-              className="asset-size-input"
-            />
-          </label>
-          <label>
-            Height:
-            <input
-              type="number"
-              value={assetSize.height}
-              min={1}
-              onChange={handleAssetHeightChange}
-              className="asset-size-input"
-            />
-          </label>
-          <button
-            onClick={() => setAspectLocked((prev) => !prev)}
-            className="aspect-lock-btn"
-            title={aspectLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
-          >
-            {aspectLocked ? "🔒" : "🔓"}
-          </button>
-        </div>
-      )}
-      {/* Image POsition */}
-      {/*selectedElement.type === "transition" &&*/ (
-        <div>
-          <label>
-            X:
-            <input
-              type="number"
-              value={selectedElement.asset?.assetPosition?.x ?? 0}
-              onChange={e =>
-                updateElementAsset(
-                  selectedElement.id,
-                  selectedElement.type,
-                  {
-                    ...selectedElement.asset,
-                    assetPosition: {
-                      x: Number(e.target.value),
-                      y: selectedElement.asset?.assetPosition?.y ?? 0
-                    }
-                  },
-                  selectedElement.allowPartialFiring,
-                )
-              }
-              style={{ width: 60, marginLeft: 5 }}
-            />
-          </label>
-          <label style={{ marginLeft: 10 }}>
-            Y:
-            <input
-              type="number"
-              value={selectedElement.asset?.assetPosition?.y ?? 0}
-              onChange={e =>
-                updateElementAsset(
-                  selectedElement.id,
-                  selectedElement.type,
-                  {
-                    ...selectedElement.asset,
-                    assetPosition: {
-                      x: selectedElement.asset?.assetPosition?.x ?? 0,
-                      y: Number(e.target.value)
-                    }
-                  },
-                  selectedElement.allowPartialFiring,
-                )
-              }
-              style={{ width: 60, marginLeft: 5 }}
-            />
-          </label>
-        </div>
-      )}
-
-      {/* Sound Selection */}
-      <label>
-        Sound:
-        <select value={selectedSound?.src || ""} onChange={handleSoundChange}>
-          <option value="">None</option>
-          {availableSounds.map((sound, index) => (
-            <option key={index} value={sound.src}>
-              {sound.src}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* Allow Partial Firing option for transitions only */}
-      {selectedElement.type === "transition" && (
+      {/* Name Setting */}
+      {(selectedElement.type === "place") && (
         <label>
           <input
-            type="checkbox"
-            checked={!selectedElement.allowPartialFiring}
-            onChange={handleAllowPartialFiringChange}
+            placeholder="Element Name"
+            type="text"
+            value={selectedElement.name || ""}
+            onChange={e =>
+              updateElementAsset(
+                selectedElement.id,
+                selectedElement.type,
+                { ...selectedElement.asset },
+                selectedElement.allowPartialFiring,
+                e.target.value // pass the name
+              )
+            }
           />
-          Need all inputs tokenized
         </label>
       )}
+
+      {selectedElement.type === "place" && selectedElement.placeType === "normal" && (
+        <>
+        {/* Image Selection */}
+        <label>
+          Image:
+          <button onClick={() => setIsImageSelectorOpen(true)}>Select Image</button>
+          <button onClick={handleClearImage} style={{ marginLeft: "10px" }}>
+            Clear Image
+          </button>
+        </label>
+        
+        {/* Show selected image thumbnail if an image is selected */}
+        {selectedImage && (
+          <img
+            src={selectedImage.src}
+            alt="Selected"
+            width={50}
+            height={50}
+            style={{ display: "block", marginTop: "10px" }}
+          />
+        )}
+
+        {/* Image Selector */}
+        {isImageSelectorOpen && (
+          <div className="image-selector">
+            <h4>Select an Image</h4>
+            <div style={{ display: "flex", gap: "10px" }}>
+              {availableImages.map((image, index) => (
+                <img
+                  key={index}
+                  src={image.src}
+                  alt={`image-${index}`}
+                  width={50}
+                  height={50}
+                  style={{ cursor: "pointer", border: selectedImage?.src === image.src ? "2px solid blue" : "1px solid gray" }}
+                  onClick={() => handleImageSelect(image)} //when an image is clicked, select it
+                />
+              ))}
+            </div>
+            <button onClick={() => setIsImageSelectorOpen(false)} style={{ marginTop: "10px" }}>
+              Close
+            </button>
+          </div>
+        )}
+
+        {/* Image Sizing */}
+        {selectedImage && (
+          <div className="asset-size-controls">
+            <label>
+              Width:
+              <input
+                type="number"
+                value={assetSize.width}
+                min={1}
+                onChange={handleAssetWidthChange}
+                className="asset-size-input"
+              />
+            </label>
+            <label>
+              Height:
+              <input
+                type="number"
+                value={assetSize.height}
+                min={1}
+                onChange={handleAssetHeightChange}
+                className="asset-size-input"
+              />
+            </label>
+            <button
+              onClick={() => setAspectLocked((prev) => !prev)}
+              className="aspect-lock-btn"
+              title={aspectLocked ? "Unlock aspect ratio" : "Lock aspect ratio"}
+            >
+              {aspectLocked ? "🔒" : "🔓"}
+            </button>
+          </div>
+        )}
+        {/* Image POsition */}
+        {/*selectedElement.type === "transition" &&*/ (
+          <div>
+            <label>
+              X:
+              <input
+                type="number"
+                value={selectedElement.asset?.assetPosition?.x ?? 0}
+                onChange={e =>
+                  updateElementAsset(
+                    selectedElement.id,
+                    selectedElement.type,
+                    {
+                      ...selectedElement.asset,
+                      assetPosition: {
+                        x: Number(e.target.value),
+                        y: selectedElement.asset?.assetPosition?.y ?? 0
+                      }
+                    },
+                    selectedElement.allowPartialFiring,
+                  )
+                }
+                style={{ width: 60, marginLeft: 5 }}
+              />
+            </label>
+            <label style={{ marginLeft: 10 }}>
+              Y:
+              <input
+                type="number"
+                value={selectedElement.asset?.assetPosition?.y ?? 0}
+                onChange={e =>
+                  updateElementAsset(
+                    selectedElement.id,
+                    selectedElement.type,
+                    {
+                      ...selectedElement.asset,
+                      assetPosition: {
+                        x: selectedElement.asset?.assetPosition?.x ?? 0,
+                        y: Number(e.target.value)
+                      }
+                    },
+                    selectedElement.allowPartialFiring,
+                  )
+                }
+                style={{ width: 60, marginLeft: 5 }}
+              />
+            </label>
+          </div>
+        )}
+
+        {/* Sound Selection */}
+        <label>
+          Sound:
+          <select value={selectedSound?.src || ""} onChange={handleSoundChange}>
+            <option value="">None</option>
+            {availableSounds.map((sound, index) => (
+              <option key={index} value={sound.src}>
+                {sound.src}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Allow Partial Firing option for transitions only */}
+        {selectedElement.type === "transition" && (
+          <label>
+            <input
+              type="checkbox"
+              checked={!selectedElement.allowPartialFiring}
+              onChange={handleAllowPartialFiringChange}
+            />
+            Need all inputs tokenized
+          </label>
+        )}
+      </>)}
     </div>
   );
 };

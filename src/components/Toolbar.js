@@ -2,18 +2,12 @@ import React from "react";
 import AssetLibrary from "./AssetLibrary";
 
 function Toolbar({
-  selectedTool,
-  setSelectedTool,
-  showAssetLibrary,
-  setShowAssetLibrary,
-  userImages,
-  userAudios,
-  handleImageUpload,
-  handleAudioUpload,
-  availableImages,
-  availableSounds,
-  onSelectImage,
-  onSelectAudio,
+  selectedTool, setSelectedTool,
+  showAssetLibrary, setShowAssetLibrary,
+  userImages, userAudios, userBackgrounds,
+  handleImageUpload, handleAudioUpload, handleBackgroundsUpload,
+  availableImages, availableSounds, availableBackgrounds,
+  onSelectImage, onSelectAudio, onSelectBackground,
 }) {
   const [assetTab, setAssetTab] = React.useState("images");
   return (
@@ -27,18 +21,36 @@ function Toolbar({
         </button>
         <button
           className={`toolbar-tab${showAssetLibrary ? " active" : ""}`}
-          onClick={() => setShowAssetLibrary(true)}
-        >
+          onClick={() => {
+            setShowAssetLibrary(true);
+            setSelectedTool(selectedTool == null);
+          }}>
           Assets
         </button>
       </div>
       {!showAssetLibrary ? (
         <div class="tool-select">
-          {/* Place Tool */}
-          <div
-            className={`tool-btn place${selectedTool === "place" ? " selected" : ""}`}
-            onClick={() => setSelectedTool(selectedTool === "place" ? null : "place")}
-          ></div>
+          <div class="tool-select-circles">
+            {/* Entry Point */}
+            <div
+              className={`tool-btn entry${selectedTool === "entry" ? " selected" : ""}`}
+              onClick={() => setSelectedTool(selectedTool === "entry" ? null : "entry")}
+            >
+              <div class="entry"></div>
+            </div>
+            {/* Place Tool */}
+            <div
+              className={`tool-btn place${selectedTool === "place" ? " selected" : ""}`}
+              onClick={() => setSelectedTool(selectedTool === "place" ? null : "place")}
+            ></div>
+            {/* Exit Point */}
+            <div
+              className={`tool-btn exit${selectedTool === "exit" ? " selected" : ""}`}
+              onClick={() => setSelectedTool(selectedTool === "exit" ? null : "exit")}
+            >
+              <div class="exit"></div>
+            </div>
+          </div>
 
           {/* Arc Tool */}
           <div
@@ -59,7 +71,13 @@ function Toolbar({
               className={`asset-subtab${assetTab === "images" ? " active" : ""}`}
               onClick={() => setAssetTab("images")}
             >
-              Images
+              Props
+            </button>
+            <button
+              className={`asset-subtab${assetTab === "backgrounds" ? " active" : ""}`}
+              onClick={() => setAssetTab("backgrounds")}
+            >
+              Backgrounds
             </button>
             <button
               className={`asset-subtab${assetTab === "audios" ? " active" : ""}`}
@@ -76,6 +94,14 @@ function Toolbar({
               handleImageUpload={handleImageUpload}
               showImages
             />
+          ) : assetTab === "backgrounds" ? (
+            <AssetLibrary
+              userBackgrounds={userBackgrounds}
+              availableBackgrounds={availableBackgrounds}
+              onSelectBackground={onSelectBackground}
+              handleBackgroundsUpload={handleBackgroundsUpload}
+              showBackgrounds
+            />
           ) : (
             <AssetLibrary
               userAudios={userAudios}
@@ -86,17 +112,6 @@ function Toolbar({
             />
           )}
         </div>
-        /*<AssetLibrary
-          userImages={userImages}
-          userAudios={userAudios}
-          handleImageUpload={handleImageUpload}
-          handleAudioUpload={handleAudioUpload}
-          availableImages={availableImages}
-          availableSounds={availableSounds}
-          onSelectImage={onSelectImage}
-          onSelectAudio={onSelectAudio}
-        />*/
-        
       )}
     </div>
   );

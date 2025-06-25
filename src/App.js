@@ -15,6 +15,7 @@ const BORDER_SIZE = 2;
 const PLACE_RADIUS = 20; //20
 const TRANSITION_WIDTH = 100;
 const TRANSITION_HEIGHT = 40;
+const INTERACT_AREA = 100;
 const debug = false; // true to show edit mode when "running"
 
 const App = () => {
@@ -68,7 +69,9 @@ const App = () => {
   // asset library const
   const [userImages, setUserImages] = useState([]); //images from user in asset library
   const [userAudios, setUserAudios] = useState([]); //audios from user in asset library
+  const [userBackgrounds, setUserBackgrounds] = useState([]); //backgrounds from user in asset library
   const [showAssetLibrary, setShowAssetLibrary] = useState(false);
+  const [showBackgroundSelector, setShowBackgroundSelector] = useState(false);
 
   const [character, setCharacter] = useState({ x: 100, y: 600, size: 80 }); // controlable character in run mode
 
@@ -98,7 +101,7 @@ const App = () => {
       transitions: [],
       arcs: [],
     },
-    {
+    /*{
       id: 4,
       name: "Waterfalls",
       background: "./assets/imgs/scenes/waterfalls_scene.jpg",
@@ -113,26 +116,29 @@ const App = () => {
       places: [],
       transitions: [],
       arcs: [],
-    },
+    },*/
   ]);
   const [currentSceneId, setCurrentSceneId] = useState(1); //default to the first scene
   const currentScene = scenes.find((scene) => scene.id === currentSceneId);
 
-  const handleAddScene = () => { //NEEDS TO BE REVAMPED
-    const url = window.prompt("Enter image URL for new scene:");
-    if (url) {
-      setScenes(prev => [
-        ...prev,
-        {
-          id: prev.length + 1,
-          name: `Scene ${prev.length + 1}`,
-          background: url,
-          places: [],
-          transitions: [],
-          arcs: [],
-        }
-      ]);
-    }
+  const handleAddScene = () => {
+    setShowBackgroundSelector(true);
+  };
+
+  // When a background is selected
+  const handleSelectBackgroundForScene = (bg) => {
+    setScenes(prev => [
+      ...prev,
+      {
+        id: prev.length + 1,
+        name: `Scene ${prev.length + 1}`,
+        background: bg.src,
+        places: [],
+        transitions: [],
+        arcs: [],
+      }
+    ]);
+    setShowBackgroundSelector(false);
   };
 
   useEffect(() => { //flip modes with esc key
@@ -167,6 +173,39 @@ const App = () => {
     });
   };
 
+  const handleBackgroundsUpload = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setUserBackgrounds(prev => [...prev, { src: ev.target.result, name: file.name }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const allAvailableImages = [ //combine preloaded and user-uploaded imags
+    ...userImages,
+    { type: "image", src: "./assets/imgs/objects/door.png" },
+    { type: "image", src: "./assets/imgs/objects/RPG_key.png" },
+    { type: "image", src: "./assets/imgs/objects/RPG_NPC.png" },
+    { type: "image", src: "./assets/imgs/objects/RPG_bag.png" },
+  ];
+
+  const allAvailableSounds = [ //combine preloaded and user-uploaded audios
+    ...userAudios,
+    { type: "audio", src: "./assets/audio/yippee-tbh-creature-jazz.mp3" },
+  ];
+
+  const allAvailableBackgrounds = [
+    ...userBackgrounds,
+    { type: "background", src: "./assets/imgs/scenes/forest_scene.jpg" },
+    { type: "background", src: "./assets/imgs/scenes/mineshaftexit_scene.png" },
+    { type: "background", src: "./assets/imgs/scenes/redmoon_scene.png" },
+    { type: "background", src: "./assets/imgs/scenes/waterfalls_scene.jpg" },
+    { type: "background", src: "./assets/imgs/scenes/grasslands_scene.png" },
+  ];
+
   const isOverlapping = (x, y) => { //when placing an element, check if there is one already
     return (
       currentScene.places.some((p) => Math.hypot(p.x - x, p.y - y) < PLACE_RADIUS+10) ||
@@ -177,7 +216,10 @@ const App = () => {
   const calculateArrowPoints = (from, to) => { //calculate the beginning and end points of the arrow
     const fromElement = currentScene.places.find((p) => p.id === from.id) || currentScene.transitions.find((t) => t.id === from.id);
     const toElement = currentScene.places.find((p) => p.id === to.id) || currentScene.transitions.find((t) => t.id === to.id);
-    if (!fromElement || !toElement) return [];
+    
+    if (!fromElement || !toElement) return []; //
+    if (fromElement?.placeType === "exit") return []; // can't start from exit
+    if (toElement?.placeType === "entry") return []; // can't end at entry
 
     let { x: x1, y: y1 } = fromElement;
     let { x: x2, y: y2 } = toElement;
@@ -225,18 +267,22 @@ const App = () => {
       //console.log("overlapping with another");
       return;}
 
-    if (selectedTool === "place") {
+    if (selectedTool === "place" || selectedTool === "entry" || selectedTool === "exit") { // sets the places, entry and exit points for the scene
+      const placeType = selectedTool === "place" ? "normal" : selectedTool;
       const updatedScenes = scenes.map((scene) =>
         scene.id === currentSceneId
           ? {
               ...scene,
-              places: [...scene.places, { id: `p${nextPlaceId}`, x, y, tokens: 0 }],
+              places: [
+                ...scene.places,
+                { id: `p${nextPlaceId}`, x, y, tokens: 0, placeType, name: "" }
+              ],
             }
           : scene
       );
       setScenes(updatedScenes);
       setNextPlaceId(nextPlaceId + 1);
-    } else if (selectedTool === "transition") {
+    } else if (selectedTool === "transition") { // sets the transmitions for the scene
       const updatedScenes = scenes.map((scene) =>
         scene.id === currentSceneId
           ? {
@@ -265,9 +311,11 @@ const App = () => {
           id,
           type,
           asset: element?.asset || null,
+          placeType: element?.placeType || "normal", //not sure if specification necessary
+          name: element?.name || null,
           //add more place properties later
         });
-      } else {
+      } else if (type === "transition") {
         element = currentScene.transitions.find((t) => t.id === id);
         setSelectedElement({
           id,
@@ -359,17 +407,6 @@ const App = () => {
       }
       return scene;
     });
-
-    /*const updatedScenes = scenes.map((scene) =>
-      scene.id === currentSceneId
-        ? {
-            ...scene,
-            arcs: scene.arcs.filter((arc) => arc.from.id !== id && arc.to.id !== id),
-            places: type === "place" ? scene.places.filter((p) => p.id !== id) : scene.places,
-            transitions: type === "transition" ? scene.transitions.filter((t) => t.id !== id) : scene.transitions,
-          }
-        : scene
-    );*/
     setScenes(updatedScenes);
     setContextMenu(null);
   };
@@ -395,7 +432,7 @@ const App = () => {
     );
   };
 
-  const updateElementAsset = (id, type, asset, allowPartialFiring) => {
+  const updateElementAsset = (id, type, asset, allowPartialFiring, name) => {
     //updates the scene's array
     const updatedScenes = scenes.map((scene) => { //loops through all the scenes and only updates the current one
       if (scene.id === currentSceneId) {
@@ -410,6 +447,7 @@ const App = () => {
                   ...(typeof allowPartialFiring !== "undefined"
                     ? { allowPartialFiring }
                     : {}),
+                  name: name, // only updates one letter at a time
                 }
               : element
           ),
@@ -427,64 +465,105 @@ const App = () => {
         ...(typeof allowPartialFiring !== "undefined"
           ? { allowPartialFiring }
           : {}),
-          /*allowPartialFiring:
-            typeof allowPartialFiring !== "undefined"
-              ? allowPartialFiring
-              : prev.allowPartialFiring,*/
+        name: name,
       }));
     }
   };
 
   const fireTransition = (transitionId) => {
     const transition = currentScene.transitions.find((t) => t.id === transitionId);
-    if (!transition) return; //check if transition even exists
+    if (!transition) return; // only transitions fire tokens
   
     const inputPlaces = currentScene.arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
     const outputPlaces = currentScene.arcs.filter((arc) => arc.from.id === transitionId).map((arc) => arc.to.id);
   
-    // Check if all input places have at least one token
+    //check if all input places have at least one token (for or/and logic)
     const allInputsHaveTokens = inputPlaces.every((id) => (currentScene.places.find((p) => p.id === id)?.tokens || 0) >= 1);
-    //console.log(allInputsHaveTokens);
-  
-    // If partialFiring is false (default), require all inputs to have tokens
     if (!transition.allowPartialFiring && !allInputsHaveTokens) return;
+    if (transition.allowPartialFiring &&
+        allInputsHaveTokens) return;
   
-    // If partialFiring is true, check if at least one input has tokens
-    if (transition.allowPartialFiring && inputPlaces.every((id) => (currentScene.places.find((p) => p.id === id)?.tokens || 0) < 1)) return;
+    // Track token changes for entry/exit names
+    const changedNames = {};
   
-    // Fire the transition
+    // 1. Update tokens for input and output places in the current scene
     const updatedScenes = scenes.map((scene) =>
-    scene.id === currentSceneId
-      ? {
-          ...scene,
-          places: scene.places.map((p) => {
-            if (inputPlaces.includes(p.id)) {
-              const newTokens = p.tokens - 1;
-              return { ...p, tokens: Math.max(newTokens, 0) }; // Prevent tokens from going negative
-            } else if (outputPlaces.includes(p.id)) {
-              return { ...p, tokens: p.tokens + 1 };
-            }
-            return p;
-          }),
+      scene.id === currentSceneId
+        ? {
+            ...scene,
+            places: scene.places.map((p) => {
+              // INPUT: Decrement tokens
+              if (inputPlaces.includes(p.id)) {
+                if ((p.placeType === "entry" || p.placeType === "exit") && p.name) {
+                  const newTokens = Math.max(p.tokens - 1, 0);
+                  changedNames[p.name] = newTokens;
+                  return { ...p, tokens: newTokens };
+                }
+                return { ...p, tokens: Math.max(p.tokens - 1, 0) };
+              }
+              // OUTPUT: Increment tokens
+              if (outputPlaces.includes(p.id)) {
+                if ((p.placeType === "entry" || p.placeType === "exit") && p.name) {
+                  const newTokens = p.tokens + 1;
+                  changedNames[p.name] = newTokens;
+                  return { ...p, tokens: newTokens };
+                }
+                return { ...p, tokens: p.tokens + 1 };
+              }
+              return p;
+            }),
+          }
+        : scene
+    );
+  
+    // 2. Synchronize all entry/exit places with the same name to the new value
+    const syncedScenes = updatedScenes.map((scene) => ({
+      ...scene,
+      places: scene.places.map((place) => {
+        if ((place.placeType === "entry" || place.placeType === "exit") && place.name && changedNames.hasOwnProperty(place.name)) {
+          return { ...place, tokens: changedNames[place.name] };
         }
-      : scene
-  );
-
-  setScenes(updatedScenes);
-    /*setPlaces((prev) =>
-      prev.map((p) => {
-        if (inputPlaces.includes(p.id)) {
-          const newTokens = p.tokens - 1;
-          return { ...p, tokens: Math.max(newTokens, 0) }; // Prevent tokens from going negative
-        } else if (outputPlaces.includes(p.id)) {
-          return { ...p, tokens: p.tokens + 1 };
-        }
-        return p;
-      })
-    );*/
+        return place;
+      }),
+    }));
+  
+    setScenes(syncedScenes);
   };
 
-  useEffect(() => { // IMPROVE IMMENSELLY
+  /*function transferToken(exitPlace, exitName) {
+    setScenes(prevScenes =>
+      prevScenes.map(scene => ({
+        ...scene,
+        places: scene.places.map(place =>
+          place.placeType === "entry" && place.name === exitName
+            //? { ...place, tokens: (place.tokens || 0) + 1 }
+            ? { ...place, tokens: (exitPlace.tokens || 0) +1 }
+            : place
+        ),
+      }))
+    );
+  }*/
+  /*function transferToken(exitPlace, exitName) {
+    setScenes(prevScenes =>
+      prevScenes.map(scene => ({
+        ...scene,
+        places: scene.places.map(place => {
+
+          if (place.placeType === "entry" && place.name === exitName) {
+            console.log("Matching Place Found:", place); // Log the place that matches the condition
+            console.log("Updating Tokens:", (exitPlace.tokens || 0) + 1); // Log the new token count
+
+            return { ...place, tokens: (place.tokens || 0) + 1 };
+          }
+          console.log("Updated Place:", place); // Log the place that was updated
+
+          return place;
+        }),
+      }))
+    );
+  }*/
+  
+  useEffect(() => { // IMPROVE IMMENSELLY WALKING AND PROXIMITY SENSOR
     if (mode !== "run") return;
     const handleKeyDown = (e) => {
       setCharacter(prev => {
@@ -503,7 +582,7 @@ const App = () => {
           const dx = character.x - t.asset.assetPosition?.x;
           const dy = character.y - t.asset.assetPosition?.y;
           //console.log(character.x + " , " + character.y + " and " + dx + " , " + dy);
-          if (Math.sqrt(dx * dx + dy * dy) < 40) {
+          if (Math.sqrt(dx * dx + dy * dy) < INTERACT_AREA) {
             console.log("interacted");
             fireTransition(t.id);
           }
@@ -525,35 +604,24 @@ const App = () => {
       currentSceneId={currentSceneId}
       setCurrentSceneId={setCurrentSceneId}
       onAddScene={handleAddScene}
+      selectedTool={selectedTool} setSelectedTool={setSelectedTool}
       />
       <div className="container">
       <Toolbar
         //tools
-        selectedTool={selectedTool}
-        setSelectedTool={setSelectedTool}
-
+        selectedTool={selectedTool} setSelectedTool={setSelectedTool}
         //assets library
-        showAssetLibrary={showAssetLibrary}
-        setShowAssetLibrary={setShowAssetLibrary}
-        userImages={userImages}
-        userAudios={userAudios}
-        handleImageUpload={handleImageUpload}
-        handleAudioUpload={handleAudioUpload}
-        availableImages={[
-          { type: "image", src: "./assets/imgs/objects/door.png" },
-          { type: "image", src: "./assets/imgs/objects/RPG_key.png" },
-          { type: "image", src: "./assets/imgs/objects/RPG_NPC.png" },
-          { type: "image", src: "./assets/imgs/objects/RPG_bag.png" },
-        ]}
-        availableSounds={[
-          { type: "audio", src: "./assets/audio/yippee-tbh-creature-jazz.mp3" },
-        ]}
-        onSelectImage={img => {/* logic to use selected image */}}
-        onSelectAudio={aud => {/* logic to use selected audio */}}
+        showAssetLibrary={showAssetLibrary} setShowAssetLibrary={setShowAssetLibrary}
+        userImages={userImages} userAudios={userAudios} userBackgrounds ={userBackgrounds}
+        handleImageUpload={handleImageUpload} handleAudioUpload={handleAudioUpload} handleBackgroundsUpload={handleBackgroundsUpload}
+        availableImages={allAvailableImages} availableSounds={allAvailableSounds} availableBackgrounds={allAvailableBackgrounds}
+        onSelectImage={img => {/* add a preview kinda to be implemented aaa*/}}
+        onSelectAudio={aud => {/* add a preview kinda to be implemented aaa */}}
+        onSelectBackground={bg => {/* add a preview kinda to be implemented aaa */}}
       />
-        <Stage className="canvas" width={width+100} height={height+100} onClick={handleStageClick} /*scaleX={stageScale} scaleY={stageScale} x={stagePosition.x} y={stagePosition.y}*/ ref={stageRef} onWheel={handleWheel} /*draggable*/>
-          <Layer>
-            <Group //working area to place elements
+      <Stage className="canvas" width={width+100} height={height+100} onClick={handleStageClick} /*scaleX={stageScale} scaleY={stageScale} x={stagePosition.x} y={stagePosition.y}*/ ref={stageRef} onWheel={handleWheel} /*draggable*/>
+        <Layer>
+          <Group //working area to place elements
               ref={workspaceRef}
               //draggable={!isElementDragging}
               x={workspacePosition.x}
@@ -579,6 +647,8 @@ const App = () => {
                 x={p.x}
                 y={p.y}
                 draggable
+                placeType={p.placeType}
+                name={p.name}
                 onClick={() => handleElementClick(p.id, "place")}
                 onDragMove={(e) => handleDragMove(e, p.id, "place")}
                 /*onDragStart={e => {
@@ -592,20 +662,29 @@ const App = () => {
                 }}*/
                 onContextMenu={(e) => handleContextMenu(e, p.id, "place")}
               >
-                <Circle
-                  radius={PLACE_RADIUS}
-                  fill="white"
-                  stroke="black"
-                  strokeWidth={BORDER_SIZE}
-                />
-                {p.asset?.image && <AssetRenderer x={0} y={0} asset={p.asset} />}
-                <Text
-                  x={-5}
-                  y={-5}
-                  text={p.tokens.toString()}
-                  fontSize={14}
-                  fill="black"
-                />
+                {p.placeType === "normal" && (
+                  <>
+                  <Circle radius={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE} />
+                  {p.asset?.image && <AssetRenderer x={0} y={0} asset={p.asset} />}
+                  <Text x={-5} y={-5} text={p.tokens.toString()} fontSize={14} fill="black" />
+                  <Text text={p.name} fontSize={14} fill="black" y={22} x={-15} />
+                  </>
+                )}
+                {p.placeType === "entry" && (
+                  <>
+                  <Circle radius={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE} />
+                  <Circle radius={PLACE_RADIUS/8} fill="black" />
+                  <Text x={-5} y={-5} text={p.tokens.toString()} fontSize={14} fill="black" />
+                  <Text text={p.name} fontSize={14} fill="black" y={22} x={-15} />
+                  </>
+                )}
+                {p.placeType === "exit" && (
+                  <>
+                  <Circle radius={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE} />
+                  <Text x={-5} y={-5} text={p.tokens.toString()} fontSize={14} fill="black" />
+                  <Text text={p.name} fontSize={14} fill="black" y={22} x={-15} />
+                  </>
+                )}
               </Group>
               ))}
   
@@ -664,59 +743,71 @@ const App = () => {
                   onContextMenu={(e) => handleContextMenu(e, index, "arc")}
                 />
               ))}
-            </Group>
-          </Layer>
-        </Stage>
-        {
-        mode === "run" && !debug && (
-          <div
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              width: "100vw",
-              height: "100vh",
-              zIndex: 9999,
-              background: "black",
-            }}
-          >
-            <Stage width={window.innerWidth} height={window.innerHeight}>
-              <Layer>
-                {/* Background */}
-                <Image
-                  x={0}
-                  y={0}
-                  width={window.innerWidth}
-                  height={window.innerHeight}
-                  image={backgroundImage}
-                />
-                {/* Actions (Transitions) */}
-                {currentScene.transitions.map((t) =>
-                  t.asset?.image ? (
-                    <LoadImage
-                      key={t.id}
-                      x={t.asset.assetPosition?.x ?? 50}
-                      y={t.asset.assetPosition?.y ?? 0}
-                      src={t.asset.image.src}
-                      width={100}
-                      height={200}
-                    />
-                  ) : null
-                )}
-                {/* Character */}
-                <Circle
-                  x={character.x}
-                  y={character.y}
-                  radius={character.size / 2}
-                  fill="red"
-                />
-              </Layer>
-            </Stage>
-          </div>
-        )}
-        {/*<Properties />*/}
-        <Properties selectedElement={selectedElement} updateElementAsset={updateElementAsset} />
+          </Group>
+        </Layer>
+      </Stage>
+      {
+      mode === "run" && !debug && (
+        <div class="scene-background">
+          <Stage width={window.innerWidth} height={window.innerHeight}>
+            <Layer>
+              {/* Background */}
+              <Image
+                x={0}
+                y={0}
+                width={window.innerWidth}
+                height={window.innerHeight}
+                image={backgroundImage}
+              />
+              {/* Actions (Transitions) */}
+              {currentScene.transitions.map((t) =>
+                t.asset?.image ? (
+                  <LoadImage
+                    key={t.id}
+                    x={t.asset.assetPosition?.x ?? 50}
+                    y={t.asset.assetPosition?.y ?? 500}
+                    src={t.asset.image.src}
+                    width={t.asset.assetSize?.width}
+                    height={t.asset.assetSize?.height}
+                  />
+                ) : null
+              )}
+              {/* Character */}
+              <Circle
+                x={character.x}
+                y={character.y}
+                radius={character.size / 2}
+                fill="red"
+              />
+            </Layer>
+          </Stage>
         </div>
+      )}
+      {/*<Properties />*/}
+      <Properties
+        selectedElement={selectedElement} updateElementAsset={updateElementAsset}
+        availableImages={allAvailableImages} availableSounds={allAvailableSounds}
+        selectedTool={selectedTool} setSelectedTool={setSelectedTool}/>
+      </div>
+      {/* Background Selector Modal */}
+      {showBackgroundSelector && (
+        <div class="background-selector-overlay">
+          <div class="background-selector">
+            <h3>Select a background for the new scene</h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 16, margin: "16px 0" }}>
+              {allAvailableBackgrounds.map((bg, idx) => (
+                <img class="background-selector-list"
+                  key={idx}
+                  src={bg.src}
+                  alt={bg.name || "bg"}
+                  onClick={() => handleSelectBackgroundForScene(bg)}
+                />
+              ))}
+            </div>
+            <button onClick={() => setShowBackgroundSelector(false)} style={{marginTop: 8}}>Cancel</button>
+          </div>
+        </div>
+      )}
       {contextMenu && (
         <div
           style={{
