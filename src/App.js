@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Stage, Layer, Circle, Rect, Arrow, Text, Image, Group } from "react-konva";
+import { Stage, Layer, Circle, Rect, Arrow, Text, Image, Group, Line } from "react-konva";
 import useImage from "use-image";
 
 import Topbar from "./components/Topbar.js";
@@ -125,7 +125,6 @@ const App = () => {
     setShowBackgroundSelector(true);
   };
 
-  // When a background is selected
   const handleSelectBackgroundForScene = (bg) => {
     setScenes(prev => [
       ...prev,
@@ -185,25 +184,25 @@ const App = () => {
   };
 
   const allAvailableImages = [ //combine preloaded and user-uploaded imags
-    ...userImages,
     { type: "image", src: "./assets/imgs/objects/door.png" },
     { type: "image", src: "./assets/imgs/objects/RPG_key.png" },
     { type: "image", src: "./assets/imgs/objects/RPG_NPC.png" },
     { type: "image", src: "./assets/imgs/objects/RPG_bag.png" },
+    ...userImages,
   ];
 
   const allAvailableSounds = [ //combine preloaded and user-uploaded audios
-    ...userAudios,
     { type: "audio", src: "./assets/audio/yippee-tbh-creature-jazz.mp3" },
+    ...userAudios,
   ];
 
   const allAvailableBackgrounds = [
-    ...userBackgrounds,
     { type: "background", src: "./assets/imgs/scenes/forest_scene.jpg" },
     { type: "background", src: "./assets/imgs/scenes/mineshaftexit_scene.png" },
     { type: "background", src: "./assets/imgs/scenes/redmoon_scene.png" },
     { type: "background", src: "./assets/imgs/scenes/waterfalls_scene.jpg" },
     { type: "background", src: "./assets/imgs/scenes/grasslands_scene.png" },
+    ...userBackgrounds,
   ];
 
   const isOverlapping = (x, y) => { //when placing an element, check if there is one already
@@ -282,12 +281,13 @@ const App = () => {
       );
       setScenes(updatedScenes);
       setNextPlaceId(nextPlaceId + 1);
-    } else if (selectedTool === "transition") { // sets the transmitions for the scene
+    } else if (selectedTool === "transition" || selectedTool === "sensor" || selectedTool === "talk" || selectedTool === "look" || selectedTool === "interact") { // sets the transmitions for the scene
+      const transitionType = selectedTool;// === "transition" ? "sensor" : selectedTool;
       const updatedScenes = scenes.map((scene) =>
         scene.id === currentSceneId
           ? {
               ...scene,
-              transitions: [...scene.transitions, { id: `t${nextTransitionId}`, x, y }],
+              transitions: [...scene.transitions, { id: `t${nextTransitionId}`, x, y, transitionType, name: transitionType.charAt(0).toUpperCase() + transitionType.slice(1), }],
             }
           : scene
       );
@@ -313,7 +313,6 @@ const App = () => {
           asset: element?.asset || null,
           placeType: element?.placeType || "normal", //not sure if specification necessary
           name: element?.name || null,
-          //add more place properties later
         });
       } else if (type === "transition") {
         element = currentScene.transitions.find((t) => t.id === id);
@@ -322,7 +321,8 @@ const App = () => {
           type,
           asset: element?.asset || null,
           allowPartialFiring: element?.allowPartialFiring ?? false,
-          //add more transition properties later
+          transitionType: element?.transitionType || "sensor", //or "talk", "look", "interact" wtv
+          name: element?.name ||"Interact",
         });
       }
 
@@ -330,7 +330,6 @@ const App = () => {
         setConnectingFrom(null);
         return;
       }
-  
       if (!connectingFrom) { //start connecting elements with arcs
         setConnectingFrom({ id, type });
         //console.log("connecting");
@@ -413,18 +412,16 @@ const App = () => {
 
   const AssetRenderer = ({ x, y, asset }) => { //render the images in the canvas
     const [image] = useImage(asset?.image?.src || null);
-  
     if (!image) return null;
   
     const aspectRatio = image.naturalWidth / image.naturalHeight;
-  
     const desiredWidth = 50;
     const desiredHeight = desiredWidth / aspectRatio;
   
     return (
       <Image
-        x={x - desiredWidth / 2} // Center the image horizontally
-        y={y + desiredHeight - 10} // Position the image
+        x={x - desiredWidth / 2}
+        y={y + desiredHeight - 10}
         image={image}
         width={desiredWidth}
         height={desiredHeight}
@@ -443,12 +440,14 @@ const App = () => {
             element.id === id
               ? {
                   ...element,
-                  asset: { ...asset },
+                  asset: asset !== undefined ? { ...element.asset, ...asset } : element.asset,
                   ...(typeof allowPartialFiring !== "undefined"
                     ? { allowPartialFiring }
                     : {}),
-                  name: name, // only updates one letter at a time
-                }
+                  ...(typeof name !== "undefined"
+                    ? { name }
+                    : {}),
+                  }
               : element
           ),
         };
@@ -461,12 +460,14 @@ const App = () => {
     if (selectedElement?.id === id && selectedElement?.type === type) {
       setSelectedElement((prev) => ({
         ...prev,
-        asset: { ...asset },
+        asset: asset !== undefined ? { ...prev.asset, ...asset } : prev.asset,
         ...(typeof allowPartialFiring !== "undefined"
           ? { allowPartialFiring }
           : {}),
-        name: name,
-      }));
+        ...(typeof name !== "undefined"
+          ? { name }
+          : {}),
+        }));
     }
   };
 
@@ -482,7 +483,6 @@ const App = () => {
     if (!transition.allowPartialFiring && !allInputsHaveTokens) return;
     if (transition.allowPartialFiring && allInputsHaveTokens) return;
   
-    //track token changes for entry/exit names
     const changedNames = {};
   
     //update tokens for input and output places in the current scene
@@ -541,15 +541,25 @@ const App = () => {
         if (e.key === "ArrowRight") x += step;
         return { ...prev, x, y };
       });
+      currentScene.transitions.forEach((t) => {
+        if (t.transitionType === "sensor") { //check proximity to set assets
+            const dx = character.x - t.asset.assetPosition?.x;
+            const dy = character.y - t.asset.assetPosition?.y;
+            //console.log(character.x + " , " + character.y + " and " + dx + " , " + dy);
+            if (Math.sqrt(dx * dx + dy * dy) < INTERACT_AREA) {
+              console.log("interacted");
+              fireTransition(t.id);
+            }
+          }
+      });
       if (e.key === " ") { //spacebar key
-        //check proximity to set assets
         currentScene.transitions.forEach((t) => {
-          if (!t.asset || !t.asset.assetPosition) return; //return nothing if t.asset doesnt exist
-          const dx = character.x - t.asset.assetPosition?.x;
-          const dy = character.y - t.asset.assetPosition?.y;
-          //console.log(character.x + " , " + character.y + " and " + dx + " , " + dy);
-          if (Math.sqrt(dx * dx + dy * dy) < INTERACT_AREA) {
-            console.log("interacted");
+          if (t.transitionType === "talk") {
+            //if (!t.asset || !t.asset.assetPosition) return; //return nothing if t.asset doesnt exist
+            // Talk to logic
+          } else if (t.transitionType === "look") {
+            // Look at logic
+          } else if (t.transitionType === "interact") { //basically always available
             fireTransition(t.id);
           }
         });
@@ -578,10 +588,10 @@ const App = () => {
         selectedTool={selectedTool} setSelectedTool={setSelectedTool}
         //assets library
         showAssetLibrary={showAssetLibrary} setShowAssetLibrary={setShowAssetLibrary}
-        userImages={userImages} userAudios={userAudios} userBackgrounds ={userBackgrounds}
+        //userImages={userImages} userAudios={userAudios} userBackgrounds ={userBackgrounds}
         handleImageUpload={handleImageUpload} handleAudioUpload={handleAudioUpload} handleBackgroundsUpload={handleBackgroundsUpload}
         availableImages={allAvailableImages} availableSounds={allAvailableSounds} availableBackgrounds={allAvailableBackgrounds}
-        onSelectImage={img => {/* add a preview kinda to be implemented aaa*/}}
+        onSelectImage={img => {/* add a delete asset to be implemented aaa*/}}
         onSelectAudio={aud => {/* add a preview kinda to be implemented aaa */}}
         onSelectBackground={bg => {/* add a preview kinda to be implemented aaa */}}
       />
@@ -628,29 +638,26 @@ const App = () => {
                 }}*/
                 onContextMenu={(e) => handleContextMenu(e, p.id, "place")}
               >
+                <Circle radius={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE} />
                 {p.placeType === "normal" && (
                   <>
-                  <Circle radius={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE} />
                   {p.asset?.image && <AssetRenderer x={0} y={0} asset={p.asset} />}
-                  <Text x={-5} y={-5} text={p.tokens.toString()} fontSize={14} fill="black" />
-                  <Text text={p.name} fontSize={14} fill="black" y={22} x={-15} />
+                  {/*<Text x={-PLACE_RADIUS} y={-5} width={PLACE_RADIUS * 2} align="center" text={p.tokens.toString()} fontSize={14} fill="black" />*/}
                   </>
                 )}
                 {p.placeType === "entry" && (
-                  <>
-                  <Circle radius={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE} />
                   <Circle radius={PLACE_RADIUS/8} fill="black" />
-                  <Text x={-5} y={-5} text={p.tokens.toString()} fontSize={14} fill="black" />
-                  <Text text={p.name} fontSize={14} fill="black" y={22} x={-15} />
-                  </>
                 )}
                 {p.placeType === "exit" && (
                   <>
-                  <Circle radius={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE} />
-                  <Text x={-5} y={-5} text={p.tokens.toString()} fontSize={14} fill="black" />
-                  <Text text={p.name} fontSize={14} fill="black" y={22} x={-15} />
+                  <Line points={[8-PLACE_RADIUS-BORDER_SIZE, 8-PLACE_RADIUS-BORDER_SIZE, PLACE_RADIUS-BORDER_SIZE-4, PLACE_RADIUS-BORDER_SIZE-4]}
+                  stroke="black" lineCap="round" lineJoin="round" strokeWidth={BORDER_SIZE} />
+                  <Line points={[8-PLACE_RADIUS-BORDER_SIZE, PLACE_RADIUS-BORDER_SIZE-4, PLACE_RADIUS-BORDER_SIZE-4, 8-PLACE_RADIUS-BORDER_SIZE]}
+                  stroke="black" lineCap="round" lineJoin="round" strokeWidth={BORDER_SIZE} />
                   </>
                 )}
+                <Text x={-PLACE_RADIUS} y={-5} width={PLACE_RADIUS * 2} align="center" text={p.tokens.toString()} fontSize={14} fill="black" />
+                <Text x={-PLACE_RADIUS*2} y={25} width={PLACE_RADIUS * 4} align="center" text={p.name} fontSize={14} fill="black" />
               </Group>
               ))}
   
@@ -686,9 +693,9 @@ const App = () => {
                   cornerRadius={5}
                 />
                 <Text
-                  x={-TRANSITION_WIDTH / 4}
+                  x={-TRANSITION_WIDTH/4}
                   y={-TRANSITION_HEIGHT / 2 + 12}
-                  text={"Action"}
+                  text={t.name}
                   fontSize={14}
                   fill="black"
                 />
@@ -730,8 +737,8 @@ const App = () => {
                 t.asset?.image ? (
                   <LoadImage
                     key={t.id}
-                    x={t.asset.assetPosition?.x ?? 50}
-                    y={t.asset.assetPosition?.y ?? 500}
+                    x={t.asset.assetPosition?.x ?? window.innerWidth*0.15}
+                    y={t.asset.assetPosition?.y ?? window.innerHeight*0.85}
                     src={t.asset.image.src}
                     width={t.asset.assetSize?.width}
                     height={t.asset.assetSize?.height}

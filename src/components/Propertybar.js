@@ -128,6 +128,11 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
     );
   };
 
+  const ConsoleLog = ({ children }) => { // for debbuging
+  console.log(children);
+  return false;
+};
+
   return (
     <div className="properties-sidebar" onClick={() => setSelectedTool(selectedTool == null) }>
       <h3>{selectedElement.name || "Undefined"}</h3>
@@ -165,6 +170,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
         
         {/* Show selected image thumbnail if an image is selected */}
         {selectedImage && (
+          <>
           <img
             src={selectedImage.src}
             alt="Selected"
@@ -172,6 +178,8 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
             height={50}
             style={{ display: "block", marginTop: "10px" }}
           />
+        {/*<ConsoleLog>{assetSize.width}</ConsoleLog>*/}
+        </>
         )}
 
         {/* Image Selector */}
