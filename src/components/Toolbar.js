@@ -36,20 +36,22 @@ function Toolbar({
         </button>
       </div>
       {!showAssetLibrary ? (
-        <div class="tool-select">
-          <div class="tool-select-circles">
+        <div className="tool-select">
+          <div className="tool-select-circles">
             {/* Entry Point */}
             <div
               //className={`tool-btn entry${selectedTool === "entry" ? " selected" : ""}`}
               onClick={() => setSelectedTool(selectedTool === "entry" ? null : "entry")}
+              title="Entry point"
             >
-              <div class="entry"></div>
+              <div className="entry"></div>
               <PlaceToolIcon placeType="entry" selected={selectedTool === "entry"}/>
             </div>
             {/* Place Tool */}
             <div
               //className={`tool-btn place${selectedTool === "place" ? " selected" : ""}`}
               onClick={() => setSelectedTool(selectedTool === "place" ? null : "place")}
+              title="Tokens place"
             >
               <PlaceToolIcon placeType="normal" selected={selectedTool === "place"}/>
             </div>
@@ -57,9 +59,10 @@ function Toolbar({
             <div
               //className={`tool-btn exit${selectedTool === "exit" ? " selected" : ""}`}
               onClick={() => setSelectedTool(selectedTool === "exit" ? null : "exit")}
+              title="Exit point"
             >
               <PlaceToolIcon placeType="exit" selected={selectedTool === "exit"}/>
-              <div class="exit"></div>
+              <div className="exit"></div>
             </div>
           </div>
 
@@ -67,6 +70,7 @@ function Toolbar({
           <div
             //className={`tool-btn arc${selectedTool === "arc" ? " selected" : ""}`}
             onClick={() => setSelectedTool(selectedTool === "arc" ? null : "arc")}
+            title="Connect actions and places"
           >
             <ArcToolIcon selected={selectedTool === "arc"} />
           </div>
@@ -76,6 +80,13 @@ function Toolbar({
             className={`tool-btn transition${selectedTool === "transition" ? " selected" : ""}`}
             onClick={() => setSelectedTool(selectedTool === "transition" ? null : "transition")}
           ></div>*/}
+          {/* Start Tool */}
+          <div
+            onClick={() => setSelectedTool(selectedTool === "start" ? null : "start")}
+            title="Game Start"
+          >
+            <TransitionToolIcon name="Start" selected={selectedTool === "start"} />
+          </div>
           {/* Sensor Tool */}
           <div
             //className={`tool-btn transition sensor${selectedTool === "sensor" ? " selected" : ""}`}
@@ -96,7 +107,7 @@ function Toolbar({
           <div
             //className={`tool-btn transition talk${selectedTool === "talk" ? " selected" : ""}`}
             onClick={() => setSelectedTool(selectedTool === "talk" ? null : "talk")}
-            title="Talk"
+            title="Talk To"
           >
             <TransitionToolIcon name="Talk to" selected={selectedTool === "talk"}/>
           </div>
@@ -104,7 +115,7 @@ function Toolbar({
           <div
             //className={`tool-btn transition look${selectedTool === "look" ? " selected" : ""}`}
             onClick={() => setSelectedTool(selectedTool === "look" ? null : "look")}
-            title="Look"
+            title="Look At"
           >
             <TransitionToolIcon name="Look at" selected={selectedTool === "look"}/>
           </div>

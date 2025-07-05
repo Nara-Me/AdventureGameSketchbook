@@ -18,6 +18,8 @@ const TRANSITION_HEIGHT = 40;
 const INTERACT_AREA = 100;
 const debug = false; // true to show edit mode when "running"
 
+let canEnterRunMode = false;
+
 const App = () => {
   const width= window.innerWidth;
   const height= window.innerHeight;
@@ -73,7 +75,8 @@ const App = () => {
   const [showAssetLibrary, setShowAssetLibrary] = useState(false);
   const [showBackgroundSelector, setShowBackgroundSelector] = useState(false);
 
-  const [character, setCharacter] = useState({ x: 100, y: 600, size: 80 }); // controlable character in run mode
+  const [globalStartTransition, setGlobalStartTransition] = useState(null); //global set up for character
+  const [character, setCharacter] = useState({ x: 100, y: 600, size: 80 }); //controlable character in run mode
 
   // scenes const
   const [scenes, setScenes] = useState([ //array of preloaded scenes for testing
@@ -121,6 +124,16 @@ const App = () => {
   const [currentSceneId, setCurrentSceneId] = useState(1); //default to the first scene
   const currentScene = scenes.find((scene) => scene.id === currentSceneId);
 
+  /*const canEnterRunMode = !!currentScene.transitions.find(
+    t => t.transitionType === "start" //&& t.asset?.image?.src
+  );*/
+  //let characterAsset;
+
+  const startTransition = currentScene.transitions.find(
+    t => t.transitionType === "start" && t.asset?.image?.src
+  );
+  const characterAsset = startTransition?.asset;
+
   const handleAddScene = () => {
     setShowBackgroundSelector(true);
   };
@@ -140,9 +153,21 @@ const App = () => {
     setShowBackgroundSelector(false);
   };
 
+  /*useEffect(() => { //activates when window is clicked on (debugging purposes)
+    const handleCLick = () => {
+      console.log(canEnterRunMode);
+    };
+    window.addEventListener("click", handleCLick);
+    return () => window.removeEventListener("click", handleCLick);
+  }, []);*/
+
   useEffect(() => { //flip modes with esc key
     const handleEsc = (e) => {
       if (e.key === "Escape") {
+        if (mode === "edit" && !canEnterRunMode) { //popup window
+          alert("You must place and set up a Start transition (with a character asset) before running!");
+          return;
+        }
         setMode((prev) => (prev === "edit" ? "run" : "edit"));
       }
     };
@@ -205,10 +230,10 @@ const App = () => {
     ...userBackgrounds,
   ];
 
-  const isOverlapping = (x, y) => { //when placing an element, check if there is one already
+  const isOverlapping = (x, y) => { //when placing an element, check if there is one already there
     return (
       currentScene.places.some((p) => Math.hypot(p.x - x, p.y - y) < PLACE_RADIUS+10) ||
-      currentScene.transitions.some((t) => Math.abs(t.x - x) < TRANSITION_WIDTH / 2 && Math.abs(t.y - y) < TRANSITION_HEIGHT / 2)
+      currentScene.transitions.some((t) => Math.abs(t.x - x) < TRANSITION_WIDTH / 1.3 && Math.abs(t.y - y) < TRANSITION_HEIGHT / 1.3)
     );
   };
 
@@ -219,6 +244,7 @@ const App = () => {
     if (!fromElement || !toElement) return []; //
     if (fromElement?.placeType === "exit") return []; // can't start from exit
     if (toElement?.placeType === "entry") return []; // can't end at entry
+    if (toElement?.transitionType === "start") return []; // can't end at start
 
     let { x: x1, y: y1 } = fromElement;
     let { x: x2, y: y2 } = toElement;
@@ -253,7 +279,7 @@ const App = () => {
     }
     if (e.evt.button !== 0 || mode !== "edit") return; //return if not in edit mode
     
-    // Convert pointer position to workspace coordinates
+    //convert pointer position to workspace coordinates (for dragging and zooming)
     const pointer = stageRef.current.getPointerPosition();
     const group = workspaceRef.current;
     const groupPos = group.getAbsolutePosition();
@@ -261,12 +287,11 @@ const App = () => {
     const y = (pointer.y - groupPos.y) / workspaceScale;
 
     //const { x, y } = e.target.getStage().getPointerPosition();
-    if (isOverlapping(x, y)) {
-      // do nothing if overlapping
+    if (isOverlapping(x, y)) { //do nothing if overlapping
       //console.log("overlapping with another");
       return;}
 
-    if (selectedTool === "place" || selectedTool === "entry" || selectedTool === "exit") { // sets the places, entry and exit points for the scene
+    if (selectedTool === "place" || selectedTool === "entry" || selectedTool === "exit") { //sets the places, entry and exit points for the scene
       const placeType = selectedTool === "place" ? "normal" : selectedTool;
       const updatedScenes = scenes.map((scene) =>
         scene.id === currentSceneId
@@ -281,13 +306,13 @@ const App = () => {
       );
       setScenes(updatedScenes);
       setNextPlaceId(nextPlaceId + 1);
-    } else if (selectedTool === "transition" || selectedTool === "sensor" || selectedTool === "talk" || selectedTool === "look" || selectedTool === "interact") { // sets the transmitions for the scene
+    } else if (selectedTool === "transition" || (selectedTool === "start" /*&& !globalStartTransition*/) || selectedTool === "sensor" || selectedTool === "talk" || selectedTool === "look" || selectedTool === "interact") { //sets the transmitions for the scene
       const transitionType = selectedTool;// === "transition" ? "sensor" : selectedTool;
       const updatedScenes = scenes.map((scene) =>
         scene.id === currentSceneId
           ? {
               ...scene,
-              transitions: [...scene.transitions, { id: `t${nextTransitionId}`, x, y, transitionType, name: transitionType.charAt(0).toUpperCase() + transitionType.slice(1), }],
+              transitions: [...scene.transitions, { id: `t${nextTransitionId}`, x, y, transitionType, name: transitionType.charAt(0).toUpperCase() + transitionType.slice(1), }], //Name is setup automatically for transitions
             }
           : scene
       );
@@ -298,7 +323,7 @@ const App = () => {
 
   const handleElementClick = (id, type) => {
     if (mode === "run" && type === "transition") {
-      fireTransition(id);
+      fireToken(id);
       return;
     }
 
@@ -410,7 +435,7 @@ const App = () => {
     setContextMenu(null);
   };
 
-  const AssetRenderer = ({ x, y, asset }) => { //render the images in the canvas
+  const AssetRenderer = ({ x, y, asset }) => { //render the images in the edit canvas
     const [image] = useImage(asset?.image?.src || null);
     if (!image) return null;
   
@@ -421,10 +446,12 @@ const App = () => {
     return (
       <Image
         x={x - desiredWidth / 2}
-        y={y + desiredHeight - 10}
+        y={y - desiredHeight}
         image={image}
         width={desiredWidth}
         height={desiredHeight}
+        scaleX={asset?.flipX ? -1 : 1} //flip asset
+        offsetX={asset?.flipX ? desiredWidth : 0} //fixed x position regardless of flip
       />
     );
   };
@@ -471,10 +498,14 @@ const App = () => {
     }
   };
 
-  const fireTransition = (transitionId) => {
+  const fireToken = (transitionId) => { //need to add an extra mode to define if token counts interactions (current function) or changes to true/false (for sensor and start)
     const transition = currentScene.transitions.find((t) => t.id === transitionId);
-    if (!transition) return; // only transitions fire tokens
+    if (!transition) return; //only transitions fire tokens
+    if (transition.transitionType === "sensor" && transition.asset?.booleanSensor) {
+      return; //boolean sensors are handled by updateBooleanSensors
+    }
   
+    //get the correct input and output places connected to the transition
     const inputPlaces = currentScene.arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
     const outputPlaces = currentScene.arcs.filter((arc) => arc.from.id === transitionId).map((arc) => arc.to.id);
   
@@ -491,22 +522,23 @@ const App = () => {
         ? {
             ...scene,
             places: scene.places.map((p) => {
-              // INPUT: Decrease num tokens
+              // decrease number of tokens in input place
               if (inputPlaces.includes(p.id)) {
                 if ((p.placeType === "entry" || p.placeType === "exit") && p.name) {
                   const newTokens = Math.max(p.tokens - 1, 0);
                   changedNames[p.name] = newTokens;
                   return { ...p, tokens: newTokens };
                 }
-                return { ...p, tokens: Math.max(p.tokens - 1, 0) };
+                return { ...p, tokens: Math.max(p.tokens - 1, 0) }; //no negative numbers
               }
-              // OUTPUT: Increment num tokens
+              // increase num tokens in output place
               if (outputPlaces.includes(p.id)) {
                 if ((p.placeType === "entry" || p.placeType === "exit") && p.name) {
                   const newTokens = p.tokens + 1;
                   changedNames[p.name] = newTokens;
                   return { ...p, tokens: newTokens };
                 }
+                if (transition.transitionType === "start") return { ...p, tokens: 1 };
                 return { ...p, tokens: p.tokens + 1 };
               }
               return p;
@@ -515,7 +547,7 @@ const App = () => {
         : scene
     );
   
-    //synchronize all entry/exit places with the same name
+    //synchronize num of tokens of all entry/exit places with the same name
     const syncedScenes = updatedScenes.map((scene) => ({
       ...scene,
       places: scene.places.map((place) => {
@@ -528,27 +560,60 @@ const App = () => {
   
     setScenes(syncedScenes);
   };
+
+  const updateBooleanSensors = () => {
+  //for each sensor in boolean mode, set the connected place's tokens to 1 if inside, 0 if outside
+  const updatedScenes = scenes.map(scene => {
+    if (scene.id !== currentSceneId) return scene;
+    let updatedPlaces = [...scene.places];
+    scene.transitions.forEach(t => {
+      if (t.transitionType === "sensor" && t.asset?.booleanSensor) {
+        //find output places
+        const outputPlaces = scene.arcs.filter(arc => arc.from.id === t.id).map(arc => arc.to.id);
+        const dx = character.x - t.asset.assetPosition?.x;
+        const dy = character.y - t.asset.assetPosition?.y;
+        const area = t.asset?.areaSize ?? INTERACT_AREA;
+        const inside = Math.sqrt(dx * dx + dy * dy) < (character.size + area);
+        updatedPlaces = updatedPlaces.map(p =>
+          outputPlaces.includes(p.id)
+            ? { ...p, tokens: inside ? 1 : 0 }
+            : p
+        );
+      }
+    });
+    return { ...scene, places: updatedPlaces };
+  });
+  setScenes(updatedScenes);
+};
   
-  useEffect(() => { // IMPROVE IMMENSELLY WALKING AND PROXIMITY SENSOR
+  useEffect(() => { // IMPROVE IMMENSELLY WALKING
+    canEnterRunMode = currentScene.transitions.find( //check if start button is defined (has character asset)
+      t => t.transitionType === "start" && t.asset?.image?.src
+    );
     if (mode !== "run") return;
+    updateBooleanSensors();
     const handleKeyDown = (e) => {
       setCharacter(prev => {
-        let { x, y, size } = prev;
+        let { x, y } = prev;
+        let size = characterAsset.assetSize?.width;
+        //console.log(size);
         const step = 10;
-        if (e.key === "ArrowUp") y -= step;
-        if (e.key === "ArrowDown") y += step;
-        if (e.key === "ArrowLeft") x -= step;
-        if (e.key === "ArrowRight") x += step;
-        return { ...prev, x, y };
+        if (e.key === "w" || e.key === "ArrowUp") y -= step;
+        if (e.key === "s" || e.key === "ArrowDown") y += step;
+        if (e.key === "a" || e.key === "ArrowLeft") x -= step;
+        if (e.key === "d" || e.key === "ArrowRight") x += step;
+        return { ...prev, x, y, size };
       });
       currentScene.transitions.forEach((t) => {
-        if (t.transitionType === "sensor") { //check proximity to set assets
+        if (t.transitionType === "start") {
+          fireToken(t.id);
+        } else if (t.transitionType === "sensor") { //check proximity to set assets
             const dx = character.x - t.asset.assetPosition?.x;
             const dy = character.y - t.asset.assetPosition?.y;
             //console.log(character.x + " , " + character.y + " and " + dx + " , " + dy);
-            if (Math.sqrt(dx * dx + dy * dy) < INTERACT_AREA) {
-              console.log("interacted");
-              fireTransition(t.id);
+            const area = t.asset?.areaSize ?? INTERACT_AREA;
+            if (Math.sqrt(dx * dx + dy * dy) < (character.size + area)) { //if area circles intersect
+              fireToken(t.id);
             }
           }
       });
@@ -557,10 +622,13 @@ const App = () => {
           if (t.transitionType === "talk") {
             //if (!t.asset || !t.asset.assetPosition) return; //return nothing if t.asset doesnt exist
             // Talk to logic
+            fireToken(t.id);
           } else if (t.transitionType === "look") {
             // Look at logic
+            fireToken(t.id);
           } else if (t.transitionType === "interact") { //basically always available
-            fireTransition(t.id);
+            fireToken(t.id);
+            console.log("interacted");
           }
         });
       }
@@ -641,12 +709,12 @@ const App = () => {
                 <Circle radius={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE} />
                 {p.placeType === "normal" && (
                   <>
-                  {p.asset?.image && <AssetRenderer x={0} y={0} asset={p.asset} />}
-                  {/*<Text x={-PLACE_RADIUS} y={-5} width={PLACE_RADIUS * 2} align="center" text={p.tokens.toString()} fontSize={14} fill="black" />*/}
+                  {p.asset?.image && <AssetRenderer x={0} y={-PLACE_RADIUS * 1.5} asset={p.asset} />}
+                  <Text x={-PLACE_RADIUS} y={-5} width={PLACE_RADIUS * 2} align="center" text={p.tokens.toString()} fontSize={14} fill="black" />
                   </>
                 )}
                 {p.placeType === "entry" && (
-                  <Circle radius={PLACE_RADIUS/8} fill="black" />
+                  <Circle radius={PLACE_RADIUS/3} fill="black" />
                 )}
                 {p.placeType === "exit" && (
                   <>
@@ -656,11 +724,10 @@ const App = () => {
                   stroke="black" lineCap="round" lineJoin="round" strokeWidth={BORDER_SIZE} />
                   </>
                 )}
-                <Text x={-PLACE_RADIUS} y={-5} width={PLACE_RADIUS * 2} align="center" text={p.tokens.toString()} fontSize={14} fill="black" />
+                {/*<Text x={-PLACE_RADIUS} y={-5} width={PLACE_RADIUS * 2} align="center" text={p.tokens.toString()} fontSize={14} fill="black" />*/}
                 <Text x={-PLACE_RADIUS*2} y={25} width={PLACE_RADIUS * 4} align="center" text={p.name} fontSize={14} fill="black" />
               </Group>
               ))}
-  
               {/* Render Transitions */}
               {currentScene.transitions.map((t) => (
               <Group
@@ -681,7 +748,7 @@ const App = () => {
                 }}*/
                 onContextMenu={(e) => handleContextMenu(e, t.id, "transition")}
               >
-                {t.asset?.image && <AssetRenderer x={0} y={-TRANSITION_HEIGHT*2.9} asset={t.asset} />}
+                {t.asset?.image && <AssetRenderer x={0} y={-TRANSITION_HEIGHT*0.8} asset={t.asset} />}
                 <Rect
                   x={-TRANSITION_WIDTH/2}
                   y={-TRANSITION_HEIGHT/2}
@@ -693,8 +760,12 @@ const App = () => {
                   cornerRadius={5}
                 />
                 <Text
-                  x={-TRANSITION_WIDTH/4}
-                  y={-TRANSITION_HEIGHT / 2 + 12}
+                  x={-TRANSITION_WIDTH*0.4}
+                  y={-8}
+                  width={TRANSITION_WIDTH*0.8}
+                  height={TRANSITION_HEIGHT}
+                  align="center"
+                  justify="center"
                   text={t.name}
                   fontSize={14}
                   fill="black"
@@ -721,7 +792,7 @@ const App = () => {
       </Stage>
       {
       mode === "run" && !debug && (
-        <div class="scene-background">
+        <div className="scene-background">
           <Stage width={window.innerWidth} height={window.innerHeight}>
             <Layer>
               {/* Background */}
@@ -732,13 +803,35 @@ const App = () => {
                 height={window.innerHeight}
                 image={backgroundImage}
               />
+              {/* Sensor Area */}
+              {currentScene.transitions.map((t) => {
+                if (
+                  (t.transitionType === "sensor" /*|| t.transitionType === "start"*/) &&
+                  t.asset?.showArea &&
+                  t.asset?.assetPosition
+                ) {
+                  return (
+                    <Circle
+                      key={t.id + "_sensorarea"}
+                      x={t.asset.assetPosition.x}
+                      y={t.asset.assetPosition.y}
+                      radius={t.asset.areaSize ?? INTERACT_AREA}
+                      fill="rgba(255, 100, 100, 0.7)"
+                      listening={false}
+                    />
+                  );
+                }
+                return null;
+              })}
               {/* Actions (Transitions) */}
-              {currentScene.transitions.map((t) =>
+              {currentScene.transitions
+               .filter(t => t.transitionType !== "start") //skips the start transition
+               .map((t) =>
                 t.asset?.image ? (
                   <LoadImage
                     key={t.id}
-                    x={t.asset.assetPosition?.x ?? window.innerWidth*0.15}
-                    y={t.asset.assetPosition?.y ?? window.innerHeight*0.85}
+                    x={t.asset.assetPosition?.x ?? window.innerWidth*0.3}
+                    y={t.asset.assetPosition?.y ?? window.innerHeight*0.7}
                     src={t.asset.image.src}
                     width={t.asset.assetSize?.width}
                     height={t.asset.assetSize?.height}
@@ -746,12 +839,24 @@ const App = () => {
                 ) : null
               )}
               {/* Character */}
-              <Circle
-                x={character.x}
-                y={character.y}
-                radius={character.size / 2}
-                fill="red"
-              />
+              {characterAsset?.image?.src && ( //if character asset is defined
+                <>
+                  <Circle
+                    x={character.x}
+                    y={character.y}
+                    radius={character.size}
+                    fill="rgba(255, 100, 100, 0.7)"
+                  />
+                  <LoadImage
+                    x={character.x}
+                    y={character.y}
+                    src={characterAsset.image.src}
+                    width={characterAsset.assetSize?.width || character.size}
+                    height={characterAsset.assetSize?.height || character.size}
+                    flipX={characterAsset.flipX}
+                  />
+                </>
+              )}
             </Layer>
           </Stage>
         </div>
@@ -764,12 +869,12 @@ const App = () => {
       </div>
       {/* Background Selector Modal */}
       {showBackgroundSelector && (
-        <div class="background-selector-overlay">
-          <div class="background-selector">
+        <div className="background-selector-overlay">
+          <div className="background-selector">
             <h3>Select a background for the new scene</h3>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16, margin: "16px 0" }}>
               {allAvailableBackgrounds.map((bg, idx) => (
-                <img class="background-selector-list"
+                <img className="background-selector-list"
                   key={idx}
                   src={bg.src}
                   alt={bg.name || "bg"}

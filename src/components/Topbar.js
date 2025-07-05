@@ -41,7 +41,7 @@ function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId, onAd
   return (
     <div className="top-bar" onClick={() => setSelectedTool(selectedTool == null) }>
       <div className="name">
-        <p>name <br/> logo</p>
+        <p>Project's name <br/> logo</p>
       </div>
     {/*<div className="name">
     <FontAwesomeIcon
@@ -60,18 +60,20 @@ function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId, onAd
       />
       {mode === "edit" ? "Switch to Run Mode" : "Switch to Edit Mode"}
     </button>*/}
-    <div className="scenes-container">
-        {scenes.map((scene) => (
-          <img
-            key={scene.id}
-            src={scene.background}
-            alt={scene.name}
-            height={80}
-            className={scene.id === currentSceneId ? "selected" : ""}
-            onClick={() => setCurrentSceneId(scene.id)}
-          />
-        ))}
-        <button className="add-scene-btn" onClick={onAddScene}>＋</button>
+    <div className="top-scrollbar">
+      <div className="scenes-container">
+          {scenes.map((scene) => (
+            <img
+              key={scene.id}
+              src={scene.background}
+              alt={scene.name}
+              height={80}
+              className={scene.id === currentSceneId ? "selected" : ""}
+              onClick={() => setCurrentSceneId(scene.id)}
+            />
+          ))}
+          <button className="add-scene-btn" onClick={onAddScene}>＋</button>
+        </div>
       </div>
     </div>
   );

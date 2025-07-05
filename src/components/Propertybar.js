@@ -32,7 +32,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
   }, [selectedElement]);
   
   useEffect(() => {
-   // When image changes, update natural size
+   //when image changes, update natural size
     if (selectedImage?.src) {
       const img = new window.Image();
       img.onload = () => setAssetNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
@@ -49,7 +49,19 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
     setSelectedImage(image); //set the selected image in the state
     if (selectedElement) {
       //update the asset (keep sound as it was)
-      updateElementAsset(selectedElement.id, selectedElement.type, { image, sound: selectedSound }, selectedElement.allowPartialFiring);
+      //updateElementAsset(selectedElement.id, selectedElement.type, { image, sound: selectedSound }, selectedElement.allowPartialFiring);
+      const img = new window.Image();
+      img.onload = () => {
+        updateElementAsset(
+          selectedElement.id, selectedElement.type,
+          {
+            image, sound: selectedSound,
+            assetSize: { width: img.naturalWidth, height: img.naturalHeight } //gets the images real size
+          },
+          selectedElement.allowPartialFiring
+        );
+      };
+      img.src = image.src;
     }
     setIsImageSelectorOpen(false); //close the image selector
   };
@@ -129,16 +141,17 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
   };
 
   const ConsoleLog = ({ children }) => { // for debbuging
-  console.log(children);
-  return false;
-};
+    console.log(children);
+    return false;
+  };
 
   return (
     <div className="properties-sidebar" onClick={() => setSelectedTool(selectedTool == null) }>
       <h3>{selectedElement.name || "Undefined"}</h3>
+      {/*<ConsoleLog>{selectedElement.type}</ConsoleLog>*/}
 
       {/* Name Setting */}
-      {(selectedElement.type === "place") && (
+      {(selectedElement.type === "place" || selectedElement.transitionType === "interact") && (
         <label>
           <input
             placeholder="Element Name"
@@ -155,6 +168,67 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
             }
           />
         </label>
+      )}
+
+      {(selectedElement.transitionType === "sensor" /*|| selectedElement.transitionType === "start"*/) && (
+        <div style={{ marginTop: 8 }}>
+          <label>
+            Area size:
+            <input
+              type="number"
+              min={1}
+              value={selectedElement.asset?.areaSize ?? 70}
+              onChange={e =>
+                updateElementAsset(
+                  selectedElement.id,
+                  selectedElement.type,
+                  {
+                    ...selectedElement.asset,
+                    areaSize: Number(e.target.value)
+                  },
+                  selectedElement.allowPartialFiring
+                )
+              }
+              style={{ width: 60, marginLeft: 5 }}
+            />
+          </label>
+          <label style={{ marginLeft: 12 }}>
+            <input
+              type="checkbox"
+              checked={!!selectedElement.asset?.showArea}
+              onChange={e =>
+                updateElementAsset(
+                  selectedElement.id,
+                  selectedElement.type,
+                  {
+                    ...selectedElement.asset,
+                    showArea: e.target.checked
+                  },
+                  selectedElement.allowPartialFiring
+                )
+              }
+            />
+            Show area
+          </label>
+          <label style={{ marginLeft: 7}}>
+            <input
+              type="checkbox"
+              checked={!!selectedElement.asset?.booleanSensor}
+              onChange={e =>
+                updateElementAsset(
+                  selectedElement.id,
+                  selectedElement.type,
+                  {
+                    ...selectedElement.asset,
+                    booleanSensor: e.target.checked
+                  },
+                  selectedElement.allowPartialFiring
+                )
+              }
+            />
+            Boolean mode
+          </label>
+        </div>
       )}
 
       {selectedElement.placeType !== "entry" && selectedElement.placeType !== "exit" && (
@@ -175,7 +249,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
             src={selectedImage.src}
             alt="Selected"
             width={50}
-            height={50}
+            //height={50}
             style={{ display: "block", marginTop: "10px" }}
           />
         {/*<ConsoleLog>{assetSize.width}</ConsoleLog>*/}
@@ -185,8 +259,8 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
         {/* Image Selector */}
         {isImageSelectorOpen && (
           <div className="image-selector">
-            <h4>Select an Image</h4>
-            <div style={{ display: "flex", gap: "10px" }}>
+            <h3>Select an Image</h3>
+            <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", maxHeight: "200px", overflowY: "auto" }}>
               {availableImages.map((image, index) => (
                 <img
                   key={index}
@@ -194,7 +268,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
                   alt={`image-${index}`}
                   width={50}
                   height={50}
-                  style={{ cursor: "pointer", border: selectedImage?.src === image.src ? "2px solid blue" : "1px solid gray" }}
+                  style={{ objectFit: "scale-down", cursor: "pointer", border: selectedImage?.src === image.src ? "2px solid blue" : "1px solid gray" }}
                   onClick={() => handleImageSelect(image)} //when an image is clicked, select it
                 />
               ))}
@@ -237,8 +311,31 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
             </button>
           </div>
         )}
+        {/* Image Flipping */}
+        {selectedImage && (
+          <div style={{ marginTop: 8 }}>
+            <label>
+              <input
+                type="checkbox"
+                checked={!!selectedElement.asset?.flipX}
+                onChange={e =>
+                  updateElementAsset(
+                    selectedElement.id,
+                    selectedElement.type,
+                    {
+                      ...selectedElement.asset,
+                      flipX: e.target.checked
+                    },
+                    selectedElement.allowPartialFiring
+                  )
+                }
+              />
+              🔄
+            </label>
+          </div>
+        )}
         {/* Image POsition */}
-        {/*selectedElement.type === "transition" &&*/ (
+        {selectedElement.type === "transition" && selectedElement.transitionType !== "start" &&(
           <div>
             <label>
               X:
@@ -301,7 +398,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
         </label>
 
         {/* Allow Partial Firing option for transitions only */}
-        {selectedElement.type === "transition" && (
+        {selectedElement.type === "transition" && selectedElement.transitionType !== "start" && (
           <label>
             <input
               type="checkbox"
