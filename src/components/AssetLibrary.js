@@ -29,7 +29,7 @@ const AssetLibrary = ({
       <>
         <div className="asset-library-images">
           {availableBackgrounds.map((bg, i) => (
-            <img key={i} src={bg.src} alt={bg.name || "bg"} className="asset-library-image"
+            <img key={i} src={bg.src} alt={"bg"} className="asset-library-image"
               onClick={() => onSelectBackground(bg)}
             />
           ))}

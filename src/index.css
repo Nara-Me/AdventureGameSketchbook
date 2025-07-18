@@ -5,6 +5,7 @@
     --coldpurple: #a4a7df;
     --wildsand: #f5f5f5;
     --white: #fffff;
+    --transparent: #0000007a
 }
 
 html,
@@ -22,6 +23,7 @@ body {
     display: flex;
     justify-content: center;
     overflow: hidden;
+    scrollbar-color: var(--luckypoint) var(--wildsand);
 }
 
 /* Topbar scene selector */
@@ -52,7 +54,6 @@ body {
     display: flex;
     width: 84vw;
     gap: 10px;
-    /*transform: rotate(180deg);*/
     overflow-x: auto;
     scrollbar-color: var(--shipcove) var(--wildsand);
     scrollbar-width: thin;
@@ -60,13 +61,17 @@ body {
     /*scrollbar-width: none;  /* Firefox, Safari 18.2+, Chromium 121+ */
 }
 
-/*.top-scrollbar {
-    overflow-x: auto;
-    transform: rotate(180deg);
-}*/
-
-.scenes-container::-webkit-scrollbar { 
-    display: none;  /* Older Safari and Chromium */
+.scenes-container::-webkit-scrollbar {
+    height: 10px;
+}
+.scenes-container {
+    scrollbar-width: thin;
+     scrollbar-color: var(--wildsand) var(--luckypoint);
+}
+.scenes-container::-webkit-scrollbar-thumb {
+    background-color: var(--wildsand) ;
+    border-radius: 6px;
+    border: 1.5px solid var(--chambray);
 }
 
 .scenes-container img {
@@ -115,6 +120,26 @@ body {
     min-width: 400px;
     max-width: 700px;
     box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+}
+
+.background-selector-ele {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin: 16px 0;
+    max-height: 45vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--wildsand) var(--shipcove);
+}
+
+.background-selector-ele::-webkit-scrollbar {
+    width: 10px;
+}
+.background-selector-ele::-webkit-scrollbar-thumb {
+    background-color: var(--wildsand) ;
+    border-radius: 6px;
+    border: 1.5px solid var(--chambray);
 }
 
 .background-selector-list {
@@ -226,6 +251,19 @@ body {
     height: calc(100vh - 200px);
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+.asset-library::-webkit-scrollbar {
+    width: 10px;
+}
+.asset-library {
+    scrollbar-width: thin;
+    scrollbar-color: var(--wildsand) var(--shipcove);
+}
+.asset-library::-webkit-scrollbar-thumb {
+    background-color: var(--wildsand) ;
+    border-radius: 6px;
+    border: 1.5px solid var(--chambray);
 }
 
 .asset-library-images, .asset-library-audios {
@@ -352,6 +390,24 @@ input[type=number] {
     border: 2px solid var(--luckypoint);
 }
 
+.image-selector-ele::-webkit-scrollbar {
+    width: 10px;
+}
+.image-selector-ele {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    max-height: 200px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--wildsand) var(--coldpurple);
+}
+.image-selector-ele::-webkit-scrollbar-thumb {
+    background-color: var(--wildsand) ;
+    border-radius: 6px;
+    border: 1.5px solid var(--chambray);
+}
+
 .asset-size-controls {
     display: flex;
     align-items: center;
@@ -392,5 +448,89 @@ input[type=number] {
     width: 100vw;
     height: 100vh;
     z-index: 9999;
-    background: black;
+    background: var(--wildsand);
+}
+
+.scene-background-preview {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 300px;
+    z-index: 999;
+    background: var(--coldpurple);
+}
+
+.inventory-assets {
+    width: 60px;
+    height: 60px;
+    background: var(--transparent);
+    border: 2px solid #333;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.inventory-slots {
+    position: fixed;
+    left: 20px;
+    bottom: 20px;
+    display: flex;
+    gap: 12px;
+    z-index: 20000;
+    width: calc(100vw - 40px);
+    overflow-y: hidden;
+    overflow-x: auto;
+}
+
+.inventory-slots::-webkit-scrollbar {
+    width: 10px;
+}
+.inventory-slots {
+    scrollbar-width: thin;
+    scrollbar-color: var(--wildsand) var(--shipcove);
+}
+.inventory-slots::-webkit-scrollbar-thumb {
+    background-color: var(--wildsand) ;
+    border-radius: 6px;
+    border: 1.5px solid var(--chambray);
+}
+
+.dialoguebox {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--transparent);
+    color: var(--white);
+    border: 2px solid #333;
+    border-radius: 12px;
+    padding: 24px;
+    width: 50vw;
+    min-width: 400px;
+    z-index: 30000;
+}
+
+.dialoguebox-option {
+    appearance: none;
+    display: block;
+    margin: 8px 0;
+    width: 100%;
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--transparent)/2;
+    color: var(--white);
+    border-radius: 6px;
+    border: 1px solid #fff;
+    cursor: pointer;
+}
+
+.context {
+    position: absolute;
+    background: white;
+    padding: 5px;
+    border: 1px solid black;
+    z-index: 1000;
 }

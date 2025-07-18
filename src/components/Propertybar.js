@@ -140,7 +140,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
     );
   };
 
-  const ConsoleLog = ({ children }) => { // for debbuging
+  const ConsoleLog = ({ children }) => { //for debbuging
     console.log(children);
     return false;
   };
@@ -170,7 +170,8 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
         </label>
       )}
 
-      {(selectedElement.transitionType === "sensor" /*|| selectedElement.transitionType === "start"*/) && (
+      {/* Area size and boolean Setting */}
+      {(selectedElement.transitionType === "sensor" || selectedElement.transitionType === "start") && (
         <div style={{ marginTop: 8 }}>
           <label>
             Area size:
@@ -210,10 +211,11 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
             />
             Show area
           </label>
+          {selectedElement.transitionType === "sensor" && (
           <label style={{ marginLeft: 7}}>
             <input
               type="checkbox"
-              checked={!!selectedElement.asset?.booleanSensor}
+              checked={!!selectedElement.asset?.booleanSensor} // make it start as checked (and actually work!!!!)
               onChange={e =>
                 updateElementAsset(
                   selectedElement.id,
@@ -228,6 +230,90 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
             />
             Boolean mode
           </label>
+          )}
+        </div>
+      )}
+
+      {/* Description text Setting */}
+      {(selectedElement.transitionType === "look" || selectedElement.transitionType === "talk") && (
+        <div style={{ marginTop: 8 }}>
+          <label>
+            Description:
+            <textarea
+              value={selectedElement.asset?.dialogueText || ""}
+              onChange={e =>
+                updateElementAsset(
+                  selectedElement.id,
+                  selectedElement.type,
+                  {
+                    ...selectedElement.asset,
+                    dialogueText: e.target.value
+                  },
+                  selectedElement.allowPartialFiring
+                )
+              }
+              style={{ width: "100%", minHeight: 60, marginTop: 4 }}
+            />
+          </label>
+        </div>
+      )}
+      
+      {/* Dialogue and options Setting */}
+      {selectedElement.transitionType === "talk" && (
+        <div style={{ marginTop: 8 }}>
+          <label>Dialogue Options:</label>
+          {(selectedElement.asset?.dialogueOptions || [""]).map((opt, idx) => ( //check for dialogue options
+            <div key={idx} style={{ display: "flex", marginBottom: 4 }}>
+              <input
+                type="text"
+                value={opt}
+                onChange={e => {
+                  const newOptions = [...(selectedElement.asset?.dialogueOptions || [""])];
+                  newOptions[idx] = e.target.value;
+                  updateElementAsset(
+                    selectedElement.id,
+                    selectedElement.type,
+                    {
+                      ...selectedElement.asset,
+                      dialogueOptions: newOptions
+                    },
+                    selectedElement.allowPartialFiring
+                  );
+                }}
+                style={{ flex: 1 }}
+              />
+              <button
+                onClick={() => {
+                  const newOptions = (selectedElement.asset?.dialogueOptions || [""]).filter((_, i) => i !== idx);
+                  updateElementAsset(
+                    selectedElement.id,
+                    selectedElement.type,
+                    {
+                      ...selectedElement.asset,
+                      dialogueOptions: newOptions.length ? newOptions : [""]
+                    },
+                    selectedElement.allowPartialFiring
+                  );
+                }}
+                style={{ marginLeft: 4 }}
+              >🗑️</button>
+            </div>
+          ))}
+          <button
+            onClick={() => {
+              const newOptions = [...(selectedElement.asset?.dialogueOptions || [""]), ""];
+              updateElementAsset(
+                selectedElement.id,
+                selectedElement.type,
+                {
+                  ...selectedElement.asset,
+                  dialogueOptions: newOptions
+                },
+                selectedElement.allowPartialFiring
+              );
+            }}
+            style={{ marginTop: 4 }}
+          >Add Option</button>
         </div>
       )}
 
@@ -260,7 +346,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
         {isImageSelectorOpen && (
           <div className="image-selector">
             <h3>Select an Image</h3>
-            <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", maxHeight: "200px", overflowY: "auto" }}>
+            <div className="image-selector-ele">
               {availableImages.map((image, index) => (
                 <img
                   key={index}

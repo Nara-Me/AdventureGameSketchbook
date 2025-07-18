@@ -5,8 +5,7 @@ import useImage from "use-image";
 import Topbar from "./components/Topbar.js";
 import Toolbar from "./components/Toolbar.js";
 import Properties from "./components/Propertybar.js";
-
-import LoadImage from "./components/LoadImage";
+import SceneStage from "./components/SceneStage";
 
 const WORKSPACE_SIZE = 5000;
 
@@ -16,7 +15,7 @@ const PLACE_RADIUS = 20; //20
 const TRANSITION_WIDTH = 100;
 const TRANSITION_HEIGHT = 40;
 const INTERACT_AREA = 100;
-const debug = false; // true to show edit mode when "running"
+const debug = false; //true to show edit mode when "running"
 
 let canEnterRunMode = false;
 
@@ -62,9 +61,9 @@ const App = () => {
   // elements (places, transitions, arcs) const
   const [selectedElement, setSelectedElement] = useState(null);
   const [mode, setMode] = useState("edit"); // Modes: "edit", "run", and maybe "overview"
-  const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows
+  const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows, entry and exit points
   const [contextMenu, setContextMenu] = useState(null); // delete and TBA
-  const [connectingFrom, setConnectingFrom] = useState(null);
+  const [connectingFrom, setConnectingFrom] = useState(null); //
   const [nextPlaceId, setNextPlaceId] = useState(1);
   const [nextTransitionId, setNextTransitionId] = useState(1);
 
@@ -75,8 +74,11 @@ const App = () => {
   const [showAssetLibrary, setShowAssetLibrary] = useState(false);
   const [showBackgroundSelector, setShowBackgroundSelector] = useState(false);
 
+  // character and interaction const idk
   const [globalStartTransition, setGlobalStartTransition] = useState(null); //global set up for character
-  const [character, setCharacter] = useState({ x: 100, y: 600, size: 80 }); //controlable character in run mode
+  const [character, setCharacter] = useState({ x: 100, y: 600, size: 100 }); //controlable character in run mode
+  const [pressedKeys, setPressedKeys] = useState({}); //state for movement pressed keys
+  const [activeDialogue, setActiveDialogue] = useState(null); //tracks the active dialogue {type, text, options}
 
   // scenes const
   const [scenes, setScenes] = useState([ //array of preloaded scenes for testing
@@ -173,7 +175,7 @@ const App = () => {
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
-  }, []);
+  }, [mode]);
 
   const handleImageUpload = (e) => { //allows for image upload from users
     const files = Array.from(e.target.files);
@@ -229,6 +231,14 @@ const App = () => {
     { type: "background", src: "./assets/imgs/scenes/grasslands_scene.png" },
     ...userBackgrounds,
   ];
+
+  const inventoryItems = currentScene.places //set place asset as an item for the inventory
+  .filter(p => p.asset?.image && (p.tokens ?? 0) > 0)
+  .map(p => ({
+    id: p.id,
+    image: p.asset.image,
+    name: p.name || "", //none have set names (for)
+  }));
 
   const isOverlapping = (x, y) => { //when placing an element, check if there is one already there
     return (
@@ -308,11 +318,16 @@ const App = () => {
       setNextPlaceId(nextPlaceId + 1);
     } else if (selectedTool === "transition" || (selectedTool === "start" /*&& !globalStartTransition*/) || selectedTool === "sensor" || selectedTool === "talk" || selectedTool === "look" || selectedTool === "interact") { //sets the transmitions for the scene
       const transitionType = selectedTool;// === "transition" ? "sensor" : selectedTool;
+      /*const defaultAsset = {};
+      if (transitionType === "sensor" || transitionType === "start") {
+        defaultAsset.showArea = true;
+        if (transitionType === "sensor") defaultAsset.booleanSensor = true;
+      }*/
       const updatedScenes = scenes.map((scene) =>
         scene.id === currentSceneId
           ? {
               ...scene,
-              transitions: [...scene.transitions, { id: `t${nextTransitionId}`, x, y, transitionType, name: transitionType.charAt(0).toUpperCase() + transitionType.slice(1), }], //Name is setup automatically for transitions
+              transitions: [...scene.transitions, { id: `t${nextTransitionId}`, x, y, transitionType, name: transitionType.charAt(0).toUpperCase() + transitionType.slice(1), /*asset: defaultAsset, */}], //Name is setup automatically for transitions
             }
           : scene
       );
@@ -321,7 +336,7 @@ const App = () => {
     }
   };
 
-  const handleElementClick = (id, type) => {
+  const handleElementClick = (id, type) => { //handle clicking on the places and transitions boxes in the canvas
     if (mode === "run" && type === "transition") {
       fireToken(id);
       return;
@@ -498,12 +513,24 @@ const App = () => {
     }
   };
 
-  const fireToken = (transitionId) => { //need to add an extra mode to define if token counts interactions (current function) or changes to true/false (for sensor and start)
+  const fireToken = (transitionId) => { //fire tokens to connected places
     const transition = currentScene.transitions.find((t) => t.id === transitionId);
     if (!transition) return; //only transitions fire tokens
     if (transition.transitionType === "sensor" && transition.asset?.booleanSensor) {
       return; //boolean sensors are handled by updateBooleanSensors
     }
+
+    /*if (transition.transitionType === "look") {
+      setActiveDialogue({
+        type: "look",
+        text: transition.asset?.dialogueText || "Nothing interesting.",
+      });
+    } else if (transition.transitionType === "talk") {
+      setActiveDialogue({
+        type: "talk",
+        options: transition.asset?.dialogueOptions || ["..."],
+      });
+    }*/
   
     //get the correct input and output places connected to the transition
     const inputPlaces = currentScene.arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
@@ -561,13 +588,15 @@ const App = () => {
     setScenes(syncedScenes);
   };
 
-  const updateBooleanSensors = () => {
-  //for each sensor in boolean mode, set the connected place's tokens to 1 if inside, 0 if outside
+  const updateBooleanSensors = () => { //set token to connected places to 1 or 0
+  //for each sensor in boolean mode
   const updatedScenes = scenes.map(scene => {
     if (scene.id !== currentSceneId) return scene;
     let updatedPlaces = [...scene.places];
     scene.transitions.forEach(t => {
-      if (t.transitionType === "sensor" && t.asset?.booleanSensor) {
+      if (t.transitionType === "start") { // get the character areaSize set in properties
+          character.size = t.asset.areaSize;
+      } else if (t.transitionType === "sensor" && t.asset?.booleanSensor) {
         //find output places
         const outputPlaces = scene.arcs.filter(arc => arc.from.id === t.id).map(arc => arc.to.id);
         const dx = character.x - t.asset.assetPosition?.x;
@@ -576,7 +605,7 @@ const App = () => {
         const inside = Math.sqrt(dx * dx + dy * dy) < (character.size + area);
         updatedPlaces = updatedPlaces.map(p =>
           outputPlaces.includes(p.id)
-            ? { ...p, tokens: inside ? 1 : 0 }
+            ? { ...p, tokens: inside ? 1 : 0 } //set the connected place's tokens to 1 if inside and 0 if outside
             : p
         );
       }
@@ -586,56 +615,94 @@ const App = () => {
   setScenes(updatedScenes);
 };
   
-  useEffect(() => { // IMPROVE IMMENSELLY WALKING
+  useEffect(() => {
     canEnterRunMode = currentScene.transitions.find( //check if start button is defined (has character asset)
       t => t.transitionType === "start" && t.asset?.image?.src
     );
     if (mode !== "run") return;
-    updateBooleanSensors();
+  }, [mode, currentScene]);
+
+  useEffect(() => { //only run when character moves to improve performance
+    if (mode === "run") {
+      updateBooleanSensors();
+    }
+  }, [character.x, character.y, character.size, mode]);
+
+  useEffect(() => { //event listener for keys input in run mode
+    if (mode !== "run") return;
+
     const handleKeyDown = (e) => {
-      setCharacter(prev => {
-        let { x, y } = prev;
-        let size = characterAsset.assetSize?.width;
-        //console.log(size);
-        const step = 10;
-        if (e.key === "w" || e.key === "ArrowUp") y -= step;
-        if (e.key === "s" || e.key === "ArrowDown") y += step;
-        if (e.key === "a" || e.key === "ArrowLeft") x -= step;
-        if (e.key === "d" || e.key === "ArrowRight") x += step;
-        return { ...prev, x, y, size };
-      });
+      setPressedKeys(prev => ({ ...prev, [e.key]: true })); //set true if key pressed
+      
       currentScene.transitions.forEach((t) => {
+        //find input place for this transition
+        const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
+        const inputPlace = inputArc && currentScene.places.find(p => p.id === inputArc.from.id);
+
         if (t.transitionType === "start") {
           fireToken(t.id);
+          character.size = t.asset.areaSize; //updates it before anything else
         } else if (t.transitionType === "sensor") { //check proximity to set assets
-            const dx = character.x - t.asset.assetPosition?.x;
-            const dy = character.y - t.asset.assetPosition?.y;
-            //console.log(character.x + " , " + character.y + " and " + dx + " , " + dy);
-            const area = t.asset?.areaSize ?? INTERACT_AREA;
-            if (Math.sqrt(dx * dx + dy * dy) < (character.size + area)) { //if area circles intersect
-              fireToken(t.id);
-            }
+          const dx = character.x - t.asset.assetPosition?.x;
+          const dy = character.y - t.asset.assetPosition?.y;
+          //console.log(character.x + " , " + character.y + " and " + dx + " , " + dy);
+          const area = t.asset?.areaSize ?? INTERACT_AREA;
+          
+          if (Math.sqrt(dx * dx + dy * dy) < (character.size + area)) { //if area circles intersect
+            fireToken(t.id);
           }
+        } else if (t.transitionType === "look" && e.key === " " && inputPlace && inputPlace.tokens > 0) {
+          setActiveDialogue({
+            type: "look",
+            text: t.asset?.dialogueText || "Nothing interesting.",
+          });
+          fireToken(t.id);
+        } else if (t.transitionType === "talk" && e.key === " " && inputPlace && inputPlace.tokens > 0) {
+          setActiveDialogue({
+            type: "talk",
+            text: t.asset?.dialogueText || "Can't talk right now...",
+            options: t.asset?.dialogueOptions || ["..."],
+          });
+          fireToken(t.id);
+        } else if (e.key === " ") { //spacebar key
+            fireToken(t.id);
+        }
       });
-      if (e.key === " ") { //spacebar key
-        currentScene.transitions.forEach((t) => {
-          if (t.transitionType === "talk") {
-            //if (!t.asset || !t.asset.assetPosition) return; //return nothing if t.asset doesnt exist
-            // Talk to logic
-            fireToken(t.id);
-          } else if (t.transitionType === "look") {
-            // Look at logic
-            fireToken(t.id);
-          } else if (t.transitionType === "interact") { //basically always available
-            fireToken(t.id);
-            console.log("interacted");
-          }
-        });
-      }
     };
+    const handleKeyUp = (e) => {
+      setPressedKeys(prev => ({ ...prev, [e.key]: false })); //set false if key released
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [mode, character, currentScene]);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "run") return;
+
+    let animationFrameId;
+    const step = 4; //smaller steps for slower movement
+
+    const moveCharacter = () => {
+      setCharacter(prev => {
+        let { x, y } = prev;
+        let size = characterAsset?.assetSize?.width;
+        if (pressedKeys["w"] /*|| pressedKeys["ArrowUp"]*/) y -= step;
+        if (pressedKeys["s"] /*|| pressedKeys["ArrowDown"]*/) y += step;
+        if (pressedKeys["a"] /*|| pressedKeys["ArrowLeft"]*/) x -= step;
+        if (pressedKeys["d"] /*|| pressedKeys["ArrowRight"]*/) x += step;
+        return { ...prev, x, y, size };
+      });
+      animationFrameId = requestAnimationFrame(moveCharacter);
+    };
+
+    animationFrameId = requestAnimationFrame(moveCharacter);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [mode, pressedKeys, characterAsset]);
 
   const backgroundImage = useImage(currentScene.background)[0]; //preload the background image so useImage works
 
@@ -790,75 +857,33 @@ const App = () => {
           </Group>
         </Layer>
       </Stage>
-      {
-      mode === "run" && !debug && (
+      {/* Small Preview */}
+      <div className="scene-background-preview">
+        <SceneStage
+          width={300}
+          height={300/(window.innerWidth/window.innerHeight)}
+          backgroundImage={backgroundImage}
+          currentScene={currentScene}
+          character={character}
+          characterAsset={characterAsset}
+          showSensors={true}
+          scale={300 / window.innerWidth}
+        />
+      </div>
+      {/* Run mode Scene */}
+      {mode === "run" && !debug && (
         <div className="scene-background">
-          <Stage width={window.innerWidth} height={window.innerHeight}>
-            <Layer>
-              {/* Background */}
-              <Image
-                x={0}
-                y={0}
-                width={window.innerWidth}
-                height={window.innerHeight}
-                image={backgroundImage}
-              />
-              {/* Sensor Area */}
-              {currentScene.transitions.map((t) => {
-                if (
-                  (t.transitionType === "sensor" /*|| t.transitionType === "start"*/) &&
-                  t.asset?.showArea &&
-                  t.asset?.assetPosition
-                ) {
-                  return (
-                    <Circle
-                      key={t.id + "_sensorarea"}
-                      x={t.asset.assetPosition.x}
-                      y={t.asset.assetPosition.y}
-                      radius={t.asset.areaSize ?? INTERACT_AREA}
-                      fill="rgba(255, 100, 100, 0.7)"
-                      listening={false}
-                    />
-                  );
-                }
-                return null;
-              })}
-              {/* Actions (Transitions) */}
-              {currentScene.transitions
-               .filter(t => t.transitionType !== "start") //skips the start transition
-               .map((t) =>
-                t.asset?.image ? (
-                  <LoadImage
-                    key={t.id}
-                    x={t.asset.assetPosition?.x ?? window.innerWidth*0.3}
-                    y={t.asset.assetPosition?.y ?? window.innerHeight*0.7}
-                    src={t.asset.image.src}
-                    width={t.asset.assetSize?.width}
-                    height={t.asset.assetSize?.height}
-                  />
-                ) : null
-              )}
-              {/* Character */}
-              {characterAsset?.image?.src && ( //if character asset is defined
-                <>
-                  <Circle
-                    x={character.x}
-                    y={character.y}
-                    radius={character.size}
-                    fill="rgba(255, 100, 100, 0.7)"
-                  />
-                  <LoadImage
-                    x={character.x}
-                    y={character.y}
-                    src={characterAsset.image.src}
-                    width={characterAsset.assetSize?.width || character.size}
-                    height={characterAsset.assetSize?.height || character.size}
-                    flipX={characterAsset.flipX}
-                  />
-                </>
-              )}
-            </Layer>
-          </Stage>
+          <SceneStage
+            width={window.innerWidth}
+            height={window.innerHeight}
+            backgroundImage={backgroundImage}
+            currentScene={currentScene}
+            character={character}
+            characterAsset={characterAsset}
+            showSensors={false}
+            className="main-stage"
+            scale={1}
+          />
         </div>
       )}
       {/*<Properties />*/}
@@ -872,7 +897,7 @@ const App = () => {
         <div className="background-selector-overlay">
           <div className="background-selector">
             <h3>Select a background for the new scene</h3>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 16, margin: "16px 0" }}>
+            <div className="background-selector-ele">
               {allAvailableBackgrounds.map((bg, idx) => (
                 <img className="background-selector-list"
                   key={idx}
@@ -886,17 +911,55 @@ const App = () => {
           </div>
         </div>
       )}
+      {/* Inventory slots */}
+      {mode === "run" && (
+        <div className="inventory-slots">
+          {Array.from({ length: Math.max(5, inventoryItems.length) }).map((_, idx) => ( //sets number of slots to 5 or more
+            <div key={idx} className="inventory-assets">
+              {inventoryItems[idx] && (
+                <span title={inventoryItems[idx]?.name || "item"}>
+                  <img
+                    src={inventoryItems[idx].image.src}
+                    alt={inventoryItems[idx].name}
+                    style={{ maxWidth: 48, maxHeight: 48 }}
+                  />
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Dialogue */}
+      {mode === "run" && activeDialogue && (
+        <div className="dialoguebox">
+          <div style={{ marginBottom: 12 }}>{activeDialogue.text}</div>
+          {activeDialogue.type === "talk" && (
+            <div>
+              {activeDialogue.options.map((opt, idx) => (
+                <button
+                  key={idx} className="dialoguebox-option"
+                  onClick={() => {
+                    /*const talkOptionTransition = currentScene.transitions.find( //find the corresponding option to fire a token
+                      t => t.transitionType === "talkOption" &&
+                        t.parentTalkId === activeDialogue.transitionId &&
+                        t.optionIndex === idx
+                    );
+                    if (talkOptionTransition) {
+                      fireToken(talkOptionTransition.id);
+                    }*/
+                    setActiveDialogue(null);
+                  }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={() => setActiveDialogue(null)}>Close</button>
+        </div>
+      )}
       {contextMenu && (
-        <div
-          style={{
-          position: "absolute",
-          top: contextMenu.y,
-          left: contextMenu.x,
-          background: "white",
-          padding: "5px",
-          border: "1px solid black",
-          zIndex: 1000}}
-        >
+        <div className="context" style={{top: contextMenu.y, left: contextMenu.x}}>
           <button onClick={deleteElement}>Delete</button>
         </div>
       )}
