@@ -22,7 +22,7 @@ const SceneStage = ({
       {/* Sensor Area */}
       {currentScene.transitions.map((t) => {
         if (
-          t.transitionType === "sensor" &&
+          //t.transitionType === "sensor" &&
           (t.asset?.showArea || showSensors) &&
           t.asset?.assetPosition
         ) {
@@ -58,22 +58,14 @@ const SceneStage = ({
       {/* Character */}
       {characterAsset?.image?.src && ( //if character asset is defined
         <>
-          {currentScene.transitions.map((t) => {
-            if (
-              t.transitionType === "start" &&
-              (characterAsset.showArea || showSensors)
-            ) {
-              return (
-                <Circle
-                  x={character.x * scale}
-                  y={character.y * scale}
-                  radius={(t.asset.areaSize ?? 100) * scale}
-                  fill="rgba(255, 100, 100, 0.7)"
-                />
-              );
-            }
-          return null;
-        })}
+          {(characterAsset.showArea || showSensors) && ( //
+            <Circle
+              x={character.x * scale}
+              y={character.y * scale}
+              radius={(characterAsset.areaSize ?? 100) * scale}
+              fill="rgba(255, 100, 100, 0.7)"
+            />
+          )}
           <LoadImage
             x={character.x * scale}
             y={character.y * scale}

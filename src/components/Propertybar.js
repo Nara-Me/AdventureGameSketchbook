@@ -9,18 +9,6 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
   const [assetNaturalSize, setAssetNaturalSize] = useState({ width: 1, height: 1 }); //image size in run mode set in properties
   const [aspectLocked, setAspectLocked] = useState(true); //lock the aspect ratio of the images in run mode or not
 
-  //images and sounds that can be selected
-  /*const availableImages = [
-    { type: "image", src: "./assets/imgs/objects/door.png" },
-    { type: "image", src: "./assets/imgs/objects/RPG_key.png" },
-    { type: "image", src: "./assets/imgs/objects/RPG_NPC.png" },
-    { type: "image", src: "./assets/imgs/objects/RPG_bag.png" },
-  ];
-
-  const availableSounds = [
-    { type: "audio", src: "./assets/audio/yippee-tbh-creature-jazz.mp3" },
-  ];*/
-
   //update the component when the selectedElement asset changes
   useEffect(() => {
     if (selectedElement) {
@@ -171,7 +159,8 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
       )}
 
       {/* Area size and boolean Setting */}
-      {(selectedElement.transitionType === "sensor" || selectedElement.transitionType === "start") && (
+      {/*(selectedElement.transitionType === "sensor" || selectedElement.transitionType === "start") && (*/}
+      {selectedElement.type === "transition" && (
         <div style={{ marginTop: 8 }}>
           <label>
             Area size:
@@ -268,7 +257,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
                 type="text"
                 value={opt}
                 onChange={e => {
-                  const newOptions = [...(selectedElement.asset?.dialogueOptions || [""])];
+                  const newOptions = [...(selectedElement.asset?.dialogueOptions || ["..."])];
                   newOptions[idx] = e.target.value;
                   updateElementAsset(
                     selectedElement.id,
@@ -297,7 +286,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
                 }}
                 style={{ marginLeft: 4 }}
               >🗑️</button>
-            </div>
+            </div> //❌
           ))}
           <button
             onClick={() => {

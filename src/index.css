@@ -527,10 +527,39 @@ input[type=number] {
     cursor: pointer;
 }
 
+.run-button {
+    position: fixed;
+    z-index: 10001;
+    min-width: 80px;
+    min-height: 40px;
+    background: #fff;
+    color: #222;
+    border: 2px solid #333;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
 .context {
     position: absolute;
-    background: white;
-    padding: 5px;
-    border: 1px solid black;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--shipcove);
+    border: 2px solid black;
+    border-radius: 5px;
     z-index: 1000;
+}
+
+.context > button {
+    all: initial;
+    font: inherit;
+    color: white;
+    width: 100px;
+    padding: 10px;
+}
+
+.context > button:hover {
+    background: var(--chambray);
+    cursor: pointer;
 }
