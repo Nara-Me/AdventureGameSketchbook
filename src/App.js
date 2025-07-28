@@ -17,7 +17,6 @@ const TRANSITION_HEIGHT = 40;
 const INTERACT_AREA = 100;
 const debug = false; //true to show edit mode when "running"
 
-let canEnterRunMode = false;
 let firstStarted = false; //only allows the start action to fire once and when reset
 
 const App = () => {
@@ -26,7 +25,7 @@ const App = () => {
 
   // workplace const
   const [workspaceScale, setWorkspaceScale] = useState(1);
-  const [workspacePosition, setWorkspacePosition] = useState({ x: 0, y: 0 });
+  const [workspacePosition, setWorkspacePosition] = useState({ x: WORKSPACE_SIZE/4, y: 0 });
   //const [isElementDragging, setIsElementDragging] = useState(false);
   const workspaceRef = useRef(null);
   const stageRef = useRef(null);
@@ -63,7 +62,7 @@ const App = () => {
   const [selectedElement, setSelectedElement] = useState(null);
   const [mode, setMode] = useState("edit"); // Modes: "edit", "run", and maybe "overview"
   const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows, entry and exit points
-  const [contextMenu, setContextMenu] = useState(null); // delete and TBA
+  const [contextMenu, setContextMenu] = useState(null); // delete, fire tokens, reset properties
   const [connectingFrom, setConnectingFrom] = useState(null); //
   const [nextPlaceId, setNextPlaceId] = useState(1);
   const [nextTransitionId, setNextTransitionId] = useState(1);
@@ -128,11 +127,6 @@ const App = () => {
   const [currentSceneId, setCurrentSceneId] = useState(1); //default to the first scene
   const currentScene = scenes.find((scene) => scene.id === currentSceneId);
 
-  /*const canEnterRunMode = !!currentScene.transitions.find(
-    t => t.transitionType === "start" //&& t.asset?.image?.src
-  );*/
-  //let characterAsset;
-
   const startTransition = currentScene.transitions.find(
     t => t.transitionType === "start" && t.asset?.image?.src
   );
@@ -142,7 +136,7 @@ const App = () => {
     setShowBackgroundSelector(true);
   };
 
-  const handleSelectBackgroundForScene = (bg) => {
+  const handleSelectBackgroundForScene = (bg) => { //handles the addition of more scenes by picking a background image
     setScenes(prev => [
       ...prev,
       {
@@ -234,13 +228,37 @@ const App = () => {
     ...userBackgrounds,
   ];
 
-  const inventoryItems = currentScene.places //set place asset as an item for the inventory (make it global)
-  .filter(p => p.asset?.image && (p.tokens ?? 0) > 0)
-  .map(p => ({
-    id: p.id,
-    image: p.asset.image,
-    name: p.name || "", //none have set names (for now)
-  }));
+  const globalPlaceMap = {}; //map of entry/exit places by name across all scenes for inventory
+  scenes.forEach(scene => {
+    scene.places.forEach(p => {
+      if ((p.placeType === "entry" || p.placeType === "exit") && p.name) {
+        if (!globalPlaceMap[p.name]) { //add place to the mapping (if not already added)
+          globalPlaceMap[p.name] = { tokens: 0, asset: p.asset, name: p.name, id: p.id };
+        }
+        globalPlaceMap[p.name].tokens += p.tokens ?? 0; //add the tokens from the place
+        if (p.asset?.image) globalPlaceMap[p.name].asset = p.asset; //add image asset (if available)
+      }
+    });
+  });
+
+  const globalNormalPlaces = []; //array for ALL normal places with tokens and an image
+  scenes.forEach(scene => { //adds places to the array
+    scene.places.forEach(p => {
+      if ( p.placeType === "normal" && p.asset?.image && (p.tokens ?? 0) > 0
+      ) {
+        globalNormalPlaces.push({
+          id: p.id, image: p.asset.image, name: p.name || "",
+        });
+      }
+    });
+  });
+
+  const inventoryItems = [ //inventory with all the gathered places with image assets and tokens
+    ...Object.values(globalPlaceMap)  //get all the entry/exit places with image and tokens
+      .filter(p => p.asset?.image && p.tokens > 0)
+      .map(p => ({ id: p.id, image: p.asset.image, name: p.name || "", })),
+    ...globalNormalPlaces //add the already filtered normal places
+  ];
 
   const isOverlapping = (x, y) => { //when placing an element, check if there is one already there
     return (
@@ -332,7 +350,9 @@ const App = () => {
         scene.id === currentSceneId
           ? {
               ...scene,
-              transitions: [...scene.transitions, { id: `t${nextTransitionId}`, x, y, transitionType, name: transitionType.charAt(0).toUpperCase() + transitionType.slice(1), asset: defaultAsset, }], //Name is setup automatically for transitions
+              transitions: [...scene.transitions, { id: `t${nextTransitionId}`, x, y,
+                                                    transitionType, name: transitionType.charAt(0).toUpperCase() + transitionType.slice(1), //name is setup automatically for transitions
+                                                    asset: defaultAsset, }],
             }
           : scene
       );
@@ -366,7 +386,7 @@ const App = () => {
           type,
           asset: element?.asset || null,
           allowPartialFiring: element?.allowPartialFiring ?? false,
-          transitionType: element?.transitionType || "sensor", //or "talk", "look", "interact" wtv
+          transitionType: element?.transitionType || "interact", //or "talk", "look", "interact" wtv
           name: element?.name ||"Interact",
         });
       }
@@ -510,6 +530,17 @@ const App = () => {
     setScenes(updatedScenes);
     setContextMenu(null);
   }
+
+  const fireElement = () => { //fires a token from the selected transition
+    setConnectingFrom(null);
+    if (!contextMenu) return;
+    const { id, type } = contextMenu;
+
+    if (type === "transition") {
+      fireToken(id); //fire the selected transition
+    }
+    setContextMenu(null);
+  };
 
   const AssetRenderer = ({ x, y, asset }) => { //render the images in the edit canvas
     const [image] = useImage(asset?.image?.src || null);
@@ -704,12 +735,12 @@ const App = () => {
     setScenes(updatedScenes);
   };
   
-  useEffect(() => {
-    const characterSet = currentScene.transitions.find( //check if start button is defined (has character asset)
+  useEffect(() => { //check if start button is defined (has character asset) to run
+    const characterSet = currentScene.transitions.find(
       t => t.transitionType === "start" && t.asset?.image?.src
     ) || globalStartAsset;
     setCanEnterRunMode(!!characterSet);
-    //if (mode !== "run") return;
+    if (mode !== "run") return;
   }, [mode, currentScene, globalStartAsset]);
 
   useEffect(() => { //only run when character moves to improve performance
@@ -783,18 +814,48 @@ const App = () => {
       setCharacter(prev => {
         let { x, y } = prev;
         let size = characterAsset?.assetSize?.width;
-        if (pressedKeys["w"] /*|| pressedKeys["ArrowUp"]*/) y -= step;
-        if (pressedKeys["s"] /*|| pressedKeys["ArrowDown"]*/) y += step;
-        if (pressedKeys["a"] /*|| pressedKeys["ArrowLeft"]*/) x -= step;
-        if (pressedKeys["d"] /*|| pressedKeys["ArrowRight"]*/) x += step;
-        return { ...prev, x, y, size };
+        if (pressedKeys["w"] || pressedKeys["W"]) y -= step;
+        if (pressedKeys["s"] || pressedKeys["S"]) y += step;
+        if (pressedKeys["a"] || pressedKeys["A"]) x -= step;
+        if (pressedKeys["d"] || pressedKeys["D"]) x += step;
+        
+        //logic for the scene transitions
+        let newSceneId = currentSceneId;
+        let newX = x;
+        const margin = 10;
+
+        if (x > window.innerWidth - size / 2 - margin) { //move to the next scene (if it even exists)
+          const currentIdx = scenes.findIndex(s => s.id === currentSceneId);
+          if (currentIdx < scenes.length - 1) {
+            newSceneId = scenes[currentIdx + 1].id;
+            newX = size / 2 + margin; //appear at left edge
+          } else {
+            newX = window.innerWidth - size / 2 - margin; //or straight to a wall
+          }
+        } else if (x < size / 2 + margin) { //move to the previous scene (if it even exists)
+          const currentIdx = scenes.findIndex(s => s.id === currentSceneId);
+          if (currentIdx > 0) {
+            newSceneId = scenes[currentIdx - 1].id;
+            newX = window.innerWidth - size / 2 - margin; //appear at right edge
+          } else {
+            newX = size / 2 + margin; //or straight to a wall
+          }
+        }
+
+        if (newSceneId !== currentSceneId) { //update scene and character position
+          setCurrentSceneId(newSceneId);
+          return { ...prev, x: newX, y, size };
+        }
+
+        const newY = Math.max(size / 2, Math.min(window.innerHeight - size / 2, y)); //walls on top and bottom
+        return { ...prev, x: newX, y: newY, size };
       });
       animationFrameId = requestAnimationFrame(moveCharacter);
     };
 
     animationFrameId = requestAnimationFrame(moveCharacter);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [mode, pressedKeys, characterAsset]);
+  }, [mode, pressedKeys, characterAsset, currentSceneId, scenes]);
 
   const backgroundImage = useImage(currentScene.background)[0]; //preload the background image so useImage works
 
@@ -866,7 +927,7 @@ const App = () => {
                 onContextMenu={(e) => handleContextMenu(e, p.id, "place")}
               >
                 <Circle radius={PLACE_RADIUS} fill="white" stroke="black" strokeWidth={BORDER_SIZE} />
-                {p.placeType === "normal" && (
+                {/*p.placeType === "normal" &&*/ (
                   <>
                   {p.asset?.image && <AssetRenderer x={0} y={-PLACE_RADIUS * 1.5} asset={p.asset} />}
                   <Text x={-PLACE_RADIUS} y={-5} width={PLACE_RADIUS * 2} align="center" text={p.tokens.toString()} fontSize={14} fill="black" />
@@ -1016,11 +1077,12 @@ const App = () => {
         </div>
       )}
       
+      {/* Interactive Buttons */}
       {mode === "run" && (
         <div>
           {currentScene.transitions
             .filter(t =>
-              ["sensor", "interact", "talk", "look"].includes(t.transitionType) &&
+              //["sensor", "interact", "talk", "look"].includes(t.transitionType) &&
               t.asset?.assetPosition &&
               t.asset?.areaSize
             )
@@ -1037,15 +1099,15 @@ const App = () => {
               if (Math.sqrt(dx * dx + dy * dy) > (character.size + area)) return null;
             
               //draw button at action's position
-              const left = t.asset.assetPosition.x * workspaceScale + workspacePosition.x;
-              const top = t.asset.assetPosition.y * workspaceScale + workspacePosition.y;
+              const left = t.asset.assetPosition.x;
+              const top = t.asset.assetPosition.y;
             
               return (
                 <button className="run-button"
                   key={t.id}
                   style={{
-                    left: left - 40,
-                    top: top - 20,
+                    left: left - TRANSITION_WIDTH/2,
+                    top: top - TRANSITION_HEIGHT/2,
                   }}
                   onClick={() => {
                     if (t.transitionType === "look") {
@@ -1123,8 +1185,16 @@ const App = () => {
       )}
       {contextMenu && (
         <div className="context" style={{top: contextMenu.y, left: contextMenu.x}}>
-          <button onClick={deleteElement}>Delete</button>
-          <button onClick={resetElement}>Reset</button>
+          {contextMenu.type === "transition" && (
+            <>
+            <button onClick={fireElement}>Fire token</button>
+            <button onClick={resetElement}>Reset properties</button>
+            </>
+          )}
+          {contextMenu.type === "place" && (
+            <button onClick={resetElement}>Reset tokens</button>
+          )}
+          <button onClick={deleteElement}>Delete element</button>
         </div>
       )}
     </div>

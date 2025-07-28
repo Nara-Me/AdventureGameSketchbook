@@ -204,7 +204,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
           <label style={{ marginLeft: 7}}>
             <input
               type="checkbox"
-              checked={!!selectedElement.asset?.booleanSensor} // make it start as checked (and actually work!!!!)
+              checked={!!selectedElement.asset?.booleanSensor}
               onChange={e =>
                 updateElementAsset(
                   selectedElement.id,
@@ -306,7 +306,7 @@ const Properties = ({ selectedElement, updateElementAsset, availableImages, avai
         </div>
       )}
 
-      {selectedElement.placeType !== "entry" && selectedElement.placeType !== "exit" && (
+      {/*selectedElement.placeType !== "entry" && selectedElement.placeType !== "exit" &&*/ (
         <>
         {/* Image Selection */}
         <label>

@@ -555,6 +555,7 @@ input[type=number] {
     all: initial;
     font: inherit;
     color: white;
+    font-size: 0.8em;
     width: 100px;
     padding: 10px;
 }
