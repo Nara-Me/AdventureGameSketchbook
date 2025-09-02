@@ -8,6 +8,7 @@ const SceneStage = ({
   character, characterAsset,
   showSensors = true,
   scale = 1,
+  usedTransitions, wasAvailable,
 }) => (
   <Stage width={width} height={height}>
     <Layer>
@@ -20,7 +21,17 @@ const SceneStage = ({
         image={backgroundImage}
       />
       {/* Sensor Area */}
-      {currentScene.transitions.map((t) => {
+      {currentScene.transitions
+      .filter(t => {
+          if (t.asset?.hideAfterUse && usedTransitions.has(t.id)) return false;
+          if (t.asset?.showWhenAvailable) {
+            const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
+            const inputPlace = inputArc && currentScene.places.find(p => p.id === inputArc.from.id);
+            return (inputPlace && inputPlace.tokens > 0) || wasAvailable.has(t.id);
+          }
+          return true;
+        })
+      .map((t) => {
         if (
           //t.transitionType === "sensor" &&
           (t.asset?.showArea || showSensors) &&
@@ -42,6 +53,15 @@ const SceneStage = ({
       {/* Actions (Transitions) */}
       {currentScene.transitions
         .filter(t => t.transitionType !== "start") //skips the start transition
+        .filter(t => {
+          if (t.asset?.hideAfterUse && usedTransitions.has(t.id)) return false;
+          if (t.asset?.showWhenAvailable) {
+            const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
+            const inputPlace = inputArc && currentScene.places.find(p => p.id === inputArc.from.id);
+            return (inputPlace && inputPlace.tokens > 0) || wasAvailable.has(t.id);
+          }
+          return true;
+        })
         .map((t) =>
           t.asset?.image ? (
             <LoadImage

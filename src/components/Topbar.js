@@ -27,7 +27,7 @@ import App from "../App";*/
   );
 };*/
 
-function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId, onAddScene, selectedTool, setSelectedTool }) {
+function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId, onAddScene, selectedTool, setSelectedTool, onSceneContextMenu }) {
   //const [selectedScene, setSelectedScene] = useState(null);
 
   //backgrounds that can be selected
@@ -70,6 +70,7 @@ function Topbar({ mode, setMode, scenes, currentSceneId, setCurrentSceneId, onAd
               height={80}
               className={scene.id === currentSceneId ? "selected" : ""}
               onClick={() => setCurrentSceneId(scene.id)}
+              onContextMenu={(e) => { e.preventDefault(); if (onSceneContextMenu) onSceneContextMenu(e.clientX, e.clientY, scene.id); }}
             />
           ))}
           <button className="add-scene-btn" onClick={onAddScene}>＋</button>

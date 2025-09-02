@@ -6,6 +6,7 @@ import Topbar from "./components/Topbar.js";
 import Toolbar from "./components/Toolbar.js";
 import Properties from "./components/Propertybar.js";
 import SceneStage from "./components/SceneStage";
+import SceneOverview from "./components/SceneOverview";
 
 const WORKSPACE_SIZE = 5000;
 
@@ -61,11 +62,13 @@ const App = () => {
   // elements (places, transitions, arcs) const
   const [selectedElement, setSelectedElement] = useState(null);
   const [mode, setMode] = useState("edit"); // Modes: "edit", "run", and maybe "overview"
-  const [selectedTool, setSelectedTool] = useState(null); // none, places, transitions, arrows, entry and exit points
+  const [selectedTool, setSelectedTool] = useState(null); //none, places, transitions, arrows, entry and exit points
   const [contextMenu, setContextMenu] = useState(null); // delete, fire tokens, reset properties
-  const [connectingFrom, setConnectingFrom] = useState(null); //
-  const [nextPlaceId, setNextPlaceId] = useState(1);
-  const [nextTransitionId, setNextTransitionId] = useState(1);
+  const [usedTransitions, setUsedTransitions] = useState(new Set()); //tracks which transitions have been "used"
+  const [wasAvailable, setWasAvailable] = useState(new Set()); //tracks which transitions have become available for asset visibility control
+  const [connectingFrom, setConnectingFrom] = useState(null); //checks which element is selected prior to the arcs connection
+  const [nextPlaceId, setNextPlaceId] = useState(1); //makes sure the places have diff ids
+  const [nextTransitionId, setNextTransitionId] = useState(1); //makes sure the transitions have diff ids
 
   // asset library const
   const [userImages, setUserImages] = useState([]); //images from user in asset library
@@ -91,7 +94,7 @@ const App = () => {
       transitions: [],
       arcs: [],
     },
-    {
+    /*{
       id: 2,
       name: "Mineshaft Exit",
       background: "./assets/imgs/scenes/mineshaftexit_scene.png",
@@ -107,7 +110,7 @@ const App = () => {
       transitions: [],
       arcs: [],
     },
-    /*{
+    {
       id: 4,
       name: "Waterfalls",
       background: "./assets/imgs/scenes/waterfalls_scene.jpg",
@@ -126,8 +129,23 @@ const App = () => {
   ]);
   const [currentSceneId, setCurrentSceneId] = useState(1); //default to the first scene
   const currentScene = scenes.find((scene) => scene.id === currentSceneId);
+  const [sceneContextMenu, setSceneContextMenu] = useState(null); // { x, y, sceneId }
 
-  const startTransition = currentScene.transitions.find(
+  // sound const
+  const ambientAudioRef = useRef(null);
+  const passThroughInsideRef = useRef(new Set());
+  const playSound = (src, { loop = false, volume = 1 } = {}) => {
+    if (!src) return null;
+    try {
+      const a = new Audio(src);
+      a.loop = !!loop;
+      a.volume = volume;
+      a.play().catch(()=>{});
+      return a;
+    } catch (e) { return null; }
+  };
+
+  const startTransition = currentScene.transitions.find( //check if start transition is defined
     t => t.transitionType === "start" && t.asset?.image?.src
   );
   const characterAsset = startTransition?.asset || globalStartAsset;
@@ -172,6 +190,17 @@ const App = () => {
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
   }, [mode, canEnterRunMode]);
+
+  useEffect(() => { //toggle overview with Tab
+    const handleTab = (e) => {
+      if (e.key === "Tab") {
+        e.preventDefault();
+        setMode((prev) => (prev === "overview" ? "edit" : "overview"));
+      }
+    };
+    window.addEventListener("keydown", handleTab);
+    return () => window.removeEventListener("keydown", handleTab);
+  }, [mode]);
 
   const handleImageUpload = (e) => { //allows for image upload from users
     const files = Array.from(e.target.files);
@@ -652,6 +681,17 @@ const App = () => {
     if (transition.transitionType === "sensor" && transition.asset?.booleanSensor) {
       return; //boolean sensors are handled by updateBooleanSensors
     }
+
+    // play sound on interaction if configured
+    if (transition.asset?.sound?.src && transition.asset?.audioMode === "interact") {
+      playSound(transition.asset.sound.src);
+    }
+
+    if (mode === "run") {
+      if (transition?.asset?.hideAfterUse) { //add to used transitions
+        setUsedTransitions(prev => new Set(prev).add(transitionId));
+      }
+    }
   
     //get the correct input and output places connected to the transition
     const inputPlaces = currentScene.arcs.filter((arc) => arc.to.id === transitionId).map((arc) => arc.from.id);
@@ -804,7 +844,7 @@ const App = () => {
     };
   }, [mode, character]);
 
-  useEffect(() => {
+  useEffect(() => { //character controls
     if (mode !== "run") return;
 
     let animationFrameId;
@@ -857,7 +897,98 @@ const App = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [mode, pressedKeys, characterAsset, currentSceneId, scenes]);
 
+  useEffect(() => { //resets the used and available transition assets in run mode
+    if (mode === "run") {
+    setUsedTransitions(new Set());
+    setWasAvailable(new Set());
+  }
+  }, [mode]);
+
+  useEffect(() => { //for showing the transition image before or after interaction
+    if (mode !== "run") return;
+    const availableNow = new Set(wasAvailable);
+    currentScene.transitions.forEach(t => {
+      if (t.asset?.showWhenAvailable) {
+        const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
+        const inputPlace = inputArc && currentScene.places.find(p => p.id === inputArc.from.id);
+        if (inputPlace && inputPlace.tokens > 0) {
+          availableNow.add(t.id);
+        }
+      }
+    });
+    setWasAvailable(availableNow);
+  }, [mode, currentScene, currentScene.places, currentScene.transitions]);
+
+  // Ambient audio: play scene ambience when in run mode
+  useEffect(() => {
+    if (ambientAudioRef.current) {
+      ambientAudioRef.current.pause();
+      ambientAudioRef.current = null;
+    }
+    if (mode !== "run") return;
+    const soundSrc = currentScene?.sound;
+    if (soundSrc) {
+      ambientAudioRef.current = playSound(soundSrc, { loop: true, volume: 0.6 });
+    }
+    return () => {
+      if (ambientAudioRef.current) {
+        ambientAudioRef.current.pause();
+        ambientAudioRef.current = null;
+      }
+    };
+  }, [mode, currentSceneId]);
+  
+  // Pass-through audio: play when character enters an action area (only in run)
+  useEffect(() => {
+    if (mode !== "run") return;
+    const insideNow = new Set();
+    currentScene.transitions.forEach(t => {
+      if (!t.asset?.assetPosition || t.asset?.audioMode !== "passThrough") return;
+      const dx = character.x - (t.asset.assetPosition.x ?? 0);
+      const dy = character.y - (t.asset.assetPosition.y ?? 0);
+      const area = t.asset.areaSize ?? INTERACT_AREA;
+      const inside = Math.sqrt(dx*dx + dy*dy) < (character.size + area);
+      if (inside) insideNow.add(t.id);
+      const wasInside = passThroughInsideRef.current.has(t.id);
+      if (inside && !wasInside) {
+        // entered — play once
+        if (t.asset?.sound?.src) playSound(t.asset.sound.src);
+      }
+    });
+    passThroughInsideRef.current = insideNow;
+  }, [character.x, character.y, character.size, mode, currentSceneId, currentScene.transitions]);
+  
+  // scene thumbnail context menu handlers (from Topbar)
+  const handleSceneContextMenu = (x, y, sceneId) => {
+    setSceneContextMenu({ x, y, sceneId });
+  };
+  const deleteScene = (sceneId) => {
+    setScenes(prev => {
+      const filtered = prev.filter(s => s.id !== sceneId);
+      if (filtered.length === 0) return prev;
+      if (currentSceneId === sceneId) setCurrentSceneId(filtered[0].id);
+      return filtered;
+    });
+    setSceneContextMenu(null);
+  };
+
   const backgroundImage = useImage(currentScene.background)[0]; //preload the background image so useImage works
+
+  const updateScene = (sceneId, updates) => {
+    setScenes(prev => prev.map(s => s.id === sceneId ? { ...s, ...updates } : s));
+    //keep selectedElement in sync if it's the same scene
+    if (selectedElement?.type === "scene" && selectedElement.id === sceneId) {
+      setSelectedElement(prev => ({
+        ...prev,
+        name: updates.name ?? prev.name,
+        asset: {
+          ...prev.asset,
+          background: updates.background ?? prev.asset?.background,
+          sound: updates.sound ?? prev.asset?.sound,
+        }
+      }));
+    }
+  };
 
   return (
     <div>
@@ -869,6 +1000,7 @@ const App = () => {
       setCurrentSceneId={setCurrentSceneId}
       onAddScene={handleAddScene}
       selectedTool={selectedTool} setSelectedTool={setSelectedTool}
+      onSceneContextMenu={handleSceneContextMenu}
       />
       <div className="container">
       <Toolbar
@@ -900,6 +1032,7 @@ const App = () => {
                 width={WORKSPACE_SIZE}
                 height={WORKSPACE_SIZE}
                 fill="#a4a7df"
+                //fill="#fff"
                 stroke="#bbb"
                 strokeWidth={4}
                 listening={false}
@@ -934,7 +1067,7 @@ const App = () => {
                   </>
                 )}
                 {p.placeType === "entry" && (
-                  <Circle radius={PLACE_RADIUS/3} fill="black" />
+                  <Circle radius={PLACE_RADIUS/1.4} fill="black" /> //PLACE_RADIUS/3
                 )}
                 {p.placeType === "exit" && (
                   <>
@@ -1020,19 +1153,23 @@ const App = () => {
                 />
               ))}
           </Group>
-        </Layer>
+        </Layer>      
       </Stage>
       {/* Small Preview */}
       <div className="scene-background-preview">
         <SceneStage
           width={300}
           height={300/(window.innerWidth/window.innerHeight)}
+          //height={300/((backgroundImage.width/backgroundImage.height) ?? (window.innerWidth/window.innerHeight))}
+          maxHeight={250}
           backgroundImage={backgroundImage}
           currentScene={currentScene}
           character={character}
           characterAsset={characterAsset}
           showSensors={true}
           scale={300 / window.innerWidth}
+          usedTransitions={usedTransitions}
+          wasAvailable={wasAvailable}
         />
       </div>
       {/* Run mode Scene */}
@@ -1048,6 +1185,8 @@ const App = () => {
             showSensors={false}
             className="main-stage"
             scale={1}
+            usedTransitions={usedTransitions}
+            wasAvailable={wasAvailable}
           />
         </div>
       )}
@@ -1055,9 +1194,10 @@ const App = () => {
       <Properties
         selectedElement={selectedElement} updateElementAsset={updateElementAsset}
         availableImages={allAvailableImages} availableSounds={allAvailableSounds}
+        availableBackgrounds={allAvailableBackgrounds} updateScene={updateScene}
         selectedTool={selectedTool} setSelectedTool={setSelectedTool}/>
       </div>
-      {/* Background Selector Modal */}
+      {/* Background Selector */}
       {showBackgroundSelector && (
         <div className="background-selector-overlay">
           <div className="background-selector">
@@ -1084,8 +1224,17 @@ const App = () => {
             .filter(t =>
               //["sensor", "interact", "talk", "look"].includes(t.transitionType) &&
               t.asset?.assetPosition &&
-              t.asset?.areaSize
-            )
+              t.asset?.areaSize)
+            .filter(t => {
+              if (t.asset?.hideAfterUse && usedTransitions.has(t.id)) return false;
+              if (t.asset?.showWhenAvailable) {
+                //only show if can be fired
+                const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
+                const inputPlace = inputArc && currentScene.places.find(p => p.id === inputArc.from.id);
+                return (inputPlace && inputPlace.tokens > 0) || wasAvailable.has(t.id);
+              }
+              return true;
+            })
             .map((t, idx) => {
               //find input place and check if it has tokens
               const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
@@ -1098,12 +1247,12 @@ const App = () => {
               const area = t.asset.areaSize ?? 70;
               if (Math.sqrt(dx * dx + dy * dy) > (character.size + area)) return null;
             
-              //draw button at action's position
+              //draw button at actions position
               const left = t.asset.assetPosition.x;
               const top = t.asset.assetPosition.y;
             
               return (
-                <button className="run-button"
+                <button className="interact-button"
                   key={t.id}
                   style={{
                     left: left - TRANSITION_WIDTH/2,
@@ -1135,7 +1284,6 @@ const App = () => {
             })}
         </div>
       )}
-
       {/* Inventory slots */}
       {mode === "run" && (
         <div className="inventory-slots">
@@ -1183,6 +1331,8 @@ const App = () => {
           <button onClick={() => setActiveDialogue(null)}>Close</button>
         </div>
       )}
+
+      {/* Elements menu */}
       {contextMenu && (
         <div className="context" style={{top: contextMenu.y, left: contextMenu.x}}>
           {contextMenu.type === "transition" && (
@@ -1196,6 +1346,23 @@ const App = () => {
           )}
           <button onClick={deleteElement}>Delete element</button>
         </div>
+      )}
+      {/* Scenes menu */}
+      {sceneContextMenu && (
+        <div className="context" style={{ top: sceneContextMenu.y, left: sceneContextMenu.x }}>
+          <button onClick={() => deleteScene(sceneContextMenu.sceneId)}>Delete scene</button>
+          <button onClick={() => setSceneContextMenu(null)}>Cancel</button>
+        </div>
+      )}
+      
+      {mode==="overview" && (
+        <div>
+        <SceneOverview
+          scenes={scenes} setScenes={setScenes}
+          setSelectedElement={setSelectedElement} setCurrentSceneId={setCurrentSceneId}
+          //onClick={handleStageClick}
+        />
+      </div>
       )}
     </div>
   );

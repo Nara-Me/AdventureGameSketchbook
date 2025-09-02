@@ -197,7 +197,7 @@ function PlaceToolIcon({ placeType, selected }) {
           />
         )}
         {placeType === "entry" && (
-          <Circle x={20+BORDER_SIZE/2} y={20+BORDER_SIZE/2} radius={6} fill="black" />
+          <Circle x={20+BORDER_SIZE/2} y={20+BORDER_SIZE/2} radius={15} fill="black" /> //6
         )}
         {placeType === "exit" && (
           <>
