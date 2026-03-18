@@ -69,6 +69,7 @@ const App = () => {
   const [connectingFrom, setConnectingFrom] = useState(null); //checks which element is selected prior to the arcs connection
   const [nextPlaceId, setNextPlaceId] = useState(1); //makes sure the places have diff ids
   const [nextTransitionId, setNextTransitionId] = useState(1); //makes sure the transitions have diff ids
+  const sensorInsideRef = useRef(new Set()); // track non-boolean sensor "inside" state
 
   // asset library const
   const [userImages, setUserImages] = useState([]); //images from user in asset library
@@ -366,7 +367,7 @@ const App = () => {
       );
       setScenes(updatedScenes);
       setNextPlaceId(nextPlaceId + 1);
-    } else if (selectedTool === "transition" || selectedTool === "start" || selectedTool === "sensor" || selectedTool === "talk" || selectedTool === "look" || selectedTool === "interact") { //sets the transmitions for the scene
+    } else if (selectedTool === "transition" || selectedTool === "start" || selectedTool === "sensor" || selectedTool === "talk" || selectedTool === "look" || selectedTool === "interact" || selectedTool === "goTo") { //sets the transitions for the scene
       if (selectedTool === "start") {
         if (globalStartAsset) return;
         firstStarted = true;
@@ -379,9 +380,14 @@ const App = () => {
         scene.id === currentSceneId
           ? {
               ...scene,
-              transitions: [...scene.transitions, { id: `t${nextTransitionId}`, x, y,
-                                                    transitionType, name: transitionType.charAt(0).toUpperCase() + transitionType.slice(1), //name is setup automatically for transitions
-                                                    asset: defaultAsset, }],
+              transitions: [...scene.transitions, {
+                id: `t${nextTransitionId}`,
+                x,
+                y,
+                transitionType,
+                name: transitionType === "goTo" ? "Go To" : transitionType.charAt(0).toUpperCase() + transitionType.slice(1),
+                asset: defaultAsset,
+              }],
             }
           : scene
       );
@@ -746,6 +752,21 @@ const App = () => {
     }));
   
     setScenes(syncedScenes);
+
+    //change the active scene to the configured destination
+    if (transition.transitionType === "goTo") {
+      const dest = transition.asset?.goToSceneId;
+      if (dest != null) {
+        // support string or number; find scene id that matches
+        const destId = Number(dest);
+        const found = scenes.find(s => s.id === destId);
+        if (found) {
+          // move to the destination scene and place character near center
+          setCurrentSceneId(found.id);
+          setCharacter(prev => ({ ...prev, x: Math.max(100, window.innerWidth / 2), y: Math.max(100, window.innerHeight / 2) }));
+        }
+      }
+    }
   };
 
   const updateBooleanSensors = () => { //set token to connected places to 1 or 0
@@ -911,7 +932,8 @@ const App = () => {
       if (t.asset?.showWhenAvailable) {
         const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
         const inputPlace = inputArc && currentScene.places.find(p => p.id === inputArc.from.id);
-        if (inputPlace && inputPlace.tokens > 0) {
+        //if there are no input arcs then treat the transition as available
+        if (!inputArc || (inputPlace && inputPlace.tokens > 0)) {
           availableNow.add(t.id);
         }
       }
@@ -919,8 +941,7 @@ const App = () => {
     setWasAvailable(availableNow);
   }, [mode, currentScene, currentScene.places, currentScene.transitions]);
 
-  // Ambient audio: play scene ambience when in run mode
-  useEffect(() => {
+  useEffect(() => { //ambient audio, play scene ambience when in run mode
     if (ambientAudioRef.current) {
       ambientAudioRef.current.pause();
       ambientAudioRef.current = null;
@@ -938,8 +959,7 @@ const App = () => {
     };
   }, [mode, currentSceneId]);
   
-  // Pass-through audio: play when character enters an action area (only in run)
-  useEffect(() => {
+  useEffect(() => { //pass-through audio, play when character enters an action area
     if (mode !== "run") return;
     const insideNow = new Set();
     currentScene.transitions.forEach(t => {
@@ -957,12 +977,39 @@ const App = () => {
     });
     passThroughInsideRef.current = insideNow;
   }, [character.x, character.y, character.size, mode, currentSceneId, currentScene.transitions]);
+
+  useEffect(() => { //fire once when character ENTERS the sensor area for non-boolean sensors
+    if (mode !== "run") {
+      //reset tracking when not in run mode
+      sensorInsideRef.current = new Set();
+      return;
+    }
+
+    const insideNow = new Set();
+    currentScene.transitions.forEach(t => {
+      if (t.transitionType !== "sensor") return;
+      // boolean sensors handled elsewhere
+      if (t.asset?.booleanSensor) return;
+      if (!t.asset?.assetPosition) return;
+      const dx = character.x - (t.asset.assetPosition.x ?? 0);
+      const dy = character.y - (t.asset.assetPosition.y ?? 0);
+      const area = t.asset.areaSize ?? INTERACT_AREA;
+      const inside = Math.sqrt(dx*dx + dy*dy) < (character.size + area);
+      if (inside) insideNow.add(t.id);
+      const wasInside = sensorInsideRef.current.has(t.id);
+      if (inside && !wasInside) {
+        //character just entered — fire token for this sensor
+        fireToken(t.id);
+      }
+    });
+    sensorInsideRef.current = insideNow;
+  }, [character.x, character.y, character.size, mode, currentSceneId, currentScene.transitions]);
   
-  // scene thumbnail context menu handlers (from Topbar)
-  const handleSceneContextMenu = (x, y, sceneId) => {
+  
+  const handleSceneContextMenu = (x, y, sceneId) => { //scene thumbnail context menu handlers (from Topbar)
     setSceneContextMenu({ x, y, sceneId });
   };
-  const deleteScene = (sceneId) => {
+  const deleteScene = (sceneId) => { //fix the double ids issue
     setScenes(prev => {
       const filtered = prev.filter(s => s.id !== sceneId);
       if (filtered.length === 0) return prev;
@@ -1031,8 +1078,8 @@ const App = () => {
                 y={-WORKSPACE_SIZE/2}
                 width={WORKSPACE_SIZE}
                 height={WORKSPACE_SIZE}
-                fill="#a4a7df"
-                //fill="#fff"
+                //fill="#a4a7df"
+                fill="#fff"
                 stroke="#bbb"
                 strokeWidth={4}
                 listening={false}
@@ -1195,7 +1242,9 @@ const App = () => {
         selectedElement={selectedElement} updateElementAsset={updateElementAsset}
         availableImages={allAvailableImages} availableSounds={allAvailableSounds}
         availableBackgrounds={allAvailableBackgrounds} updateScene={updateScene}
-        selectedTool={selectedTool} setSelectedTool={setSelectedTool}/>
+        selectedTool={selectedTool} setSelectedTool={setSelectedTool}
+        scenes={scenes}
+      />
       </div>
       {/* Background Selector */}
       {showBackgroundSelector && (
@@ -1222,15 +1271,16 @@ const App = () => {
         <div>
           {currentScene.transitions
             .filter(t =>
-              //["sensor", "interact", "talk", "look"].includes(t.transitionType) &&
+              !["sensor"].includes(t.transitionType) && //stop sensor from showing up in the run mode
               t.asset?.assetPosition &&
               t.asset?.areaSize)
             .filter(t => {
               if (t.asset?.hideAfterUse && usedTransitions.has(t.id)) return false;
               if (t.asset?.showWhenAvailable) {
-                //only show if can be fired
+                // only show if can be fired; if there are no input arcs treat as available
                 const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
                 const inputPlace = inputArc && currentScene.places.find(p => p.id === inputArc.from.id);
+                if (!inputArc) return true;
                 return (inputPlace && inputPlace.tokens > 0) || wasAvailable.has(t.id);
               }
               return true;
@@ -1239,7 +1289,8 @@ const App = () => {
               //find input place and check if it has tokens
               const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
               const inputPlace = inputArc && currentScene.places.find(p => p.id === inputArc.from.id);
-              if (!inputPlace || inputPlace.tokens <= 0) return null;
+              // if there is an input arc, require tokens; if no input arc, allow interaction
+              if (inputArc && (!inputPlace || inputPlace.tokens <= 0)) return null;
             
               //check if character is within area
               const dx = character.x - t.asset.assetPosition.x;

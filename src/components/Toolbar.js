@@ -10,6 +10,7 @@ const TRANSITION_HEIGHT = 40;
 
 function Toolbar({
   selectedTool, setSelectedTool,
+  mode,
   showAssetLibrary, setShowAssetLibrary,
   userImages, userAudios, userBackgrounds,
   handleImageUpload, handleAudioUpload, handleBackgroundsUpload,
@@ -88,6 +89,7 @@ function Toolbar({
             <TransitionToolIcon name="Start" selected={selectedTool === "start"} />
           </div>
           {/* Sensor Tool */}
+          {mode !== "run" && (
           <div
             //className={`tool-btn transition sensor${selectedTool === "sensor" ? " selected" : ""}`}
             onClick={() => setSelectedTool(selectedTool === "sensor" ? null : "sensor")}
@@ -95,6 +97,7 @@ function Toolbar({
           >
             <TransitionToolIcon name="Sensor" selected={selectedTool === "sensor"}/>
           </div>
+          )}
           {/* Interact Tool */}
           <div
             //className={`tool-btn transition interact${selectedTool === "interact" ? " selected" : ""}`}
@@ -107,7 +110,7 @@ function Toolbar({
           <div
             //className={`tool-btn transition talk${selectedTool === "talk" ? " selected" : ""}`}
             onClick={() => setSelectedTool(selectedTool === "talk" ? null : "talk")}
-            title="Talk To"
+            title="Talk To (dialogue with option)"
           >
             <TransitionToolIcon name="Talk to" selected={selectedTool === "talk"}/>
           </div>
@@ -115,9 +118,17 @@ function Toolbar({
           <div
             //className={`tool-btn transition look${selectedTool === "look" ? " selected" : ""}`}
             onClick={() => setSelectedTool(selectedTool === "look" ? null : "look")}
-            title="Look At"
+            title="Look At (display info)"
           >
             <TransitionToolIcon name="Look at" selected={selectedTool === "look"}/>
+          </div>
+
+          {/* Go To Tool */}
+          <div
+            onClick={() => setSelectedTool(selectedTool === "goTo" ? null : "goTo")}
+            title="Go To (change scene)"
+          >
+            <TransitionToolIcon name="Go To" selected={selectedTool === "goTo"} />
           </div>
         </div>
       ) : (

@@ -1,22 +1,8 @@
 //fix the arrow points and add the places
-//re add the comments in the property bar
 
 import React, { useEffect } from "react";
 import { Stage, Layer, Group, Text, Arrow, Rect } from "react-konva";
 import LoadImage from "./LoadImage";
-
-/**
- * SceneOverview
- * - Full-screen stage showing all scenes as draggable thumbnails
- * - Draws arrows between scenes when an exit place name matches an entry place name
- * - Clicking a scene selects it (Properties panel will edit the scene)
- *
- * Props:
- *  - scenes, setScenes
- *  - setSelectedElement (to allow Properties to edit a "scene" object)
- *  - setCurrentSceneId (optional; double-click could open scene)
- *  - width, height (optional)
- */
 
 const w = 200; //360
 const h = 110; //200
@@ -25,7 +11,7 @@ const SceneOverview = ({
   scenes, setScenes, setSelectedElement, setCurrentSceneId,
   width = window.innerWidth, height = window.innerHeight,
 }) => {
-  // ensure scenes have x,y for layout
+  //make sure scenes have x,y for layout
   useEffect(() => {
     let needUpdate = false;
     const updated = scenes.map((s, idx) => {
@@ -56,7 +42,7 @@ const SceneOverview = ({
     });
   };
 
-  // Build arrows: for each exit place with a name, link to scenes that have an entry with same name
+  //link exit and entry points with arrow from scenes
   const arrows = [];
   scenes.forEach(srcScene => {
     const srcX = srcScene._ovx ?? 0;
@@ -65,7 +51,7 @@ const SceneOverview = ({
     const srcH = h;
     srcScene.places?.forEach(place => {
       if ((place.placeType === "exit") && place.name) {
-        // find scenes with entry of same name
+        //find scenes with entry of same name
         scenes.forEach(dstScene => {
           if (dstScene.id === srcScene.id) return;
           const match = dstScene.places?.some(p => p.placeType === "entry" && p.name === place.name);

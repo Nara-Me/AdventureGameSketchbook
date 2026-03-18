@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 
-const Properties = ({ selectedElement, updateElementAsset, availableImages, availableSounds, selectedTool, setSelectedTool, availableBackgrounds, updateScene }) => {
+const Properties = ({ selectedElement, updateElementAsset, availableImages, availableSounds, selectedTool, setSelectedTool, availableBackgrounds, updateScene, scenes = [] }) => {
   //variables to store the selected image, sound
   const [selectedImage, setSelectedImage] = useState(null); //selected image for each element
   const [selectedSound, setSelectedSound] = useState(null); //selected sound for each element
@@ -274,7 +274,7 @@ return (
         ) : (
           <>
             {/* Name Setting */}
-            {(selectedElement.type === "place" || selectedElement.transitionType === "interact") && (
+            {/*(selectedElement.type === "place" || selectedElement.transitionType === "interact") && (*/
               <label>
                 <input
                   placeholder="Element Name"
@@ -291,6 +291,38 @@ return (
                   }
                 />
               </label>
+            /*)*/}
+
+            {/* Go To destination selector */}
+            {selectedElement.transitionType === "goTo" && (
+              <div style={{ marginTop: 8 }}>
+                <label>
+                  Destination Scene:
+                  <select
+                    value={selectedElement.asset?.goToSceneId ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value === "" ? null : Number(e.target.value);
+                      setSelectedSound(selectedSound);
+                      if (selectedElement) {
+                        updateElementAsset(
+                          selectedElement.id,
+                          selectedElement.type,
+                          { ...selectedElement.asset, goToSceneId: val },
+                          selectedElement.allowPartialFiring
+                        );
+                      }
+                    }}
+                    style={{ width: "100%", marginTop: 6 }}
+                  >
+                    <option value="">None</option>
+                    {scenes.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name || `Scene ${s.id}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             )}
 
             {/* Area size and boolean Setting */}

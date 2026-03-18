@@ -3,6 +3,10 @@
     --chambray: #3a4e98;
     --shipcove: #6174b3;
     --coldpurple: #a4a7df;
+    /*--luckypoint: #f5f5f5;
+    --chambray: #f5f5f5;
+    --shipcove: #f5f5f5;
+    --coldpurple: #f5f5f5;*/
     --wildsand: #f5f5f5;
     --white: #fffff;
     --transparent: #0000007a
@@ -362,9 +366,9 @@ img[alt^="bg"] {
     transition: transform 0.18s ease;
     box-sizing: border-box;
 }
-.properties-sidebar:has(.properties-overview) {
+/*.properties-sidebar:has(.properties-overview) {
     height: calc(100vh - 100px);
-}
+}*/
 .properties-sidebar > .properties-content {
     direction: ltr;
     padding-bottom: 30px;

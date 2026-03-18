@@ -27,6 +27,8 @@ const SceneStage = ({
           if (t.asset?.showWhenAvailable) {
             const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
             const inputPlace = inputArc && currentScene.places.find(p => p.id === inputArc.from.id);
+            //if there are no input arcs for this transition treat it as available
+            if (!inputArc) return true;
             return (inputPlace && inputPlace.tokens > 0) || wasAvailable.has(t.id);
           }
           return true;
@@ -58,10 +60,11 @@ const SceneStage = ({
           if (t.asset?.showWhenAvailable) {
             const inputArc = currentScene.arcs.find(arc => arc.to.id === t.id && arc.from.type === "place");
             const inputPlace = inputArc && currentScene.places.find(p => p.id === inputArc.from.id);
+            if (!inputArc) return true;
             return (inputPlace && inputPlace.tokens > 0) || wasAvailable.has(t.id);
           }
           return true;
-        })
+         })
         .map((t) =>
           t.asset?.image ? (
             <LoadImage
