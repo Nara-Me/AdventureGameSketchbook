@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/AdventureGameSketchbook/static/css/main.31486a2b.css",
+    "main.js": "/AdventureGameSketchbook/static/js/main.df723982.js",
+    "static/js/453.68693753.chunk.js": "/AdventureGameSketchbook/static/js/453.68693753.chunk.js",
+    "index.html": "/AdventureGameSketchbook/index.html",
+    "main.31486a2b.css.map": "/AdventureGameSketchbook/static/css/main.31486a2b.css.map",
+    "main.df723982.js.map": "/AdventureGameSketchbook/static/js/main.df723982.js.map",
+    "453.68693753.chunk.js.map": "/AdventureGameSketchbook/static/js/453.68693753.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.31486a2b.css",
+    "static/js/main.df723982.js"
+  ]
+}
